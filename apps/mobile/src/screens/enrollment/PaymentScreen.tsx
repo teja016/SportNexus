@@ -104,24 +104,21 @@ export default function PaymentScreen({ navigation }: any) {
         `&cu=INR` +
         `&tn=${encodeURIComponent(note)}`
 
-      const canOpen = await Linking.canOpenURL(upiUrl)
-      if (!canOpen) {
-        // Fallback: show UPI ID for manual payment
-        setLoading(false)
+      waitingForUPI.current = true
+      setLoading(false)
+      try {
+        await Linking.openURL(upiUrl)
+      } catch {
+        waitingForUPI.current = false
         Alert.alert(
-          'No UPI App Found',
-          `Please pay ₹${totalFee.toFixed(2)} to UPI ID:\n\n${MERCHANT_UPI_ID}\n\nRef: ${note}\n\nThen tap "I've Paid" to confirm.`,
+          'Open UPI App',
+          `Please open any UPI app (GPay / PhonePe / Paytm) and pay:\n\n₹${totalFee.toFixed(2)} → ${MERCHANT_UPI_ID}\n\nRef: ${note}\n\nThen tap "I've Paid" to confirm.`,
           [
             { text: 'Cancel', style: 'cancel' },
             { text: "I've Paid", onPress: () => { setPendingEnrollId(enrollmentId); setShowConfirm(true) } },
           ]
         )
-        return
       }
-
-      waitingForUPI.current = true
-      setLoading(false)
-      await Linking.openURL(upiUrl)
     } catch (err: any) {
       setLoading(false)
       setError(err.response?.data?.error?.message ?? err.message ?? 'Payment failed. Please try again.')
