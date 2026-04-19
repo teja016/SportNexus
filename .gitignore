@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.next/
+.expo/
+.expo-shared/
+web-build/
+
+# Env files — never commit real credentials
+.env
+.env.*
+!.env.example
+
+.turbo/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+prisma/migrations/

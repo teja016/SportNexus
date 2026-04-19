@@ -1,0 +1,36 @@
+{
+  "name": "sportnexus",
+  "version": "2.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:admin": "npm run dev --workspace=apps/admin",
+    "dev:mobile": "npm run start --workspace=apps/mobile",
+    "build:api": "npm run build --workspace=apps/api",
+    "build:admin": "npm run build --workspace=apps/admin",
+    "db:generate": "npm run db:generate --workspace=packages/db",
+    "db:push": "npm run db:push --workspace=packages/db",
+    "db:migrate": "npm run db:migrate --workspace=packages/db",
+    "db:seed": "npm run db:seed --workspace=packages/db",
+    "db:studio": "npm run db:studio --workspace=packages/db",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "setup": "npm install && npm run db:generate && npm run docker:up"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "dependencies": {
+    "lucide-react": "^1.8.0"
+  }
+}

@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: sportnexus-api
+    runtime: node
+    region: singapore
+    buildCommand: npm ci && npx prisma generate --schema=packages/db/prisma/schema.prisma && npx prisma db push --schema=packages/db/prisma/schema.prisma
+    startCommand: npm run start --workspace=apps/api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sportnexus-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: sportnexus-redis
+          type: redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SMTP_EMAIL
+        sync: false
+      - key: SMTP_APP_PASSWORD
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+
+  - type: redis
+    name: sportnexus-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+
+databases:
+  - name: sportnexus-db
+    plan: free
+    databaseName: sportnexus
+    user: sportnexus

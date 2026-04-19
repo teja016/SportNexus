@@ -1,0 +1,263 @@
+import React, { useState } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, Modal, StyleSheet, Platform } from 'react-native'
+import { useQuery } from '@tanstack/react-query'
+import { Ionicons } from '@expo/vector-icons'
+import { userAPI } from '../../services/api'
+import { useAuthStore } from '../../store/authStore'
+import { useLocalEnrollmentsStore } from '../../store/localEnrollmentsStore'
+import { useFavoritesStore } from '../../store/favoritesStore'
+import { Colors, FontSize, FontWeight, BorderRadius, Shadow, SportColors } from '../../constants/theme'
+import { SPORT_ICONS } from '@sportnexus/utils'
+
+const MENU_SECTIONS = [
+  {
+    title: 'Account',
+    items: [
+      { icon: 'person-outline' as const,        label: 'Edit Profile',      sub: 'Update your details',  screen: 'EditProfile', enabled: true },
+      { icon: 'location-outline' as const,      label: 'Saved Addresses',   sub: 'Pickup & home locations', screen: null,         enabled: false },
+      { icon: 'notifications-outline' as const, label: 'Notifications',     sub: 'Push & email alerts',   screen: null,         enabled: false },
+    ],
+  },
+  {
+    title: 'Support',
+    items: [
+      { icon: 'help-circle-outline' as const,   label: 'Help & FAQ',        sub: 'Common questions',     screen: null, enabled: false },
+      { icon: 'chatbubble-outline' as const,    label: 'Contact Support',   sub: 'Chat with our team',   screen: null, enabled: false },
+      { icon: 'document-text-outline' as const, label: 'Terms & Privacy',   sub: 'Legal information',    screen: null, enabled: false },
+    ],
+  },
+]
+
+export default function ProfileScreen({ navigation }: any) {
+  const { user, logout } = useAuthStore()
+  const { enrollments: localEnrollments } = useLocalEnrollmentsStore()
+  const { favorites, toggleFavorite } = useFavoritesStore()
+  const [showLogout, setShowLogout] = useState(false)
+
+  const { data } = useQuery({
+    queryKey: ['user-me'],
+    queryFn:  () => userAPI.getProfile(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  })
+
+  const profile  = data ?? user
+  const initials = profile?.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() ?? '?'
+  const active   = localEnrollments.filter((e) => ['PENDING', 'CONFIRMED', 'ACTIVE'].includes(e.status)).length
+  const academies= new Set(localEnrollments.map((e) => (e as any).slot?.program?.academyId).filter(Boolean)).size
+
+  function confirmLogout() {
+    if (Platform.OS !== 'web') {
+      const { Alert } = require('react-native')
+      Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: logout },
+      ])
+    } else {
+      setShowLogout(true)
+    }
+  }
+
+  return (
+    <>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
+        {/* ── Hero Header ──────────────────────────────────── */}
+        <View style={styles.hero}>
+          <View style={styles.heroBg} />
+
+          <View style={styles.avatarWrap}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+            {profile?.role && profile.role !== 'USER' && (
+              <View style={styles.roleBadge}>
+                <Ionicons name="shield-checkmark" size={10} color="#fff" />
+                <Text style={styles.roleText}>{profile.role.replace('_', ' ')}</Text>
+              </View>
+            )}
+          </View>
+
+          <Text style={styles.name}>{profile?.name ?? '—'}</Text>
+          <Text style={styles.contact}>{profile?.phone ?? profile?.email ?? '—'}</Text>
+
+          {/* Stats row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{localEnrollments.length}</Text>
+              <Text style={styles.statLabel}>Enrollments</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: Colors.accent }]}>{active}</Text>
+              <Text style={styles.statLabel}>Active</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: '#818CF8' }]}>{academies}</Text>
+              <Text style={styles.statLabel}>Academies</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Menu Sections ────────────────────────────────── */}
+        <View style={styles.menuArea}>
+          {MENU_SECTIONS.map((section) => (
+            <View key={section.title} style={styles.section}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <View style={styles.menuCard}>
+                {section.items.map((item, idx) => (
+                  <TouchableOpacity
+                    key={item.label}
+                    style={[styles.menuItem, idx < section.items.length - 1 && styles.menuItemBorder]}
+                    onPress={() => item.screen ? navigation.navigate(item.screen) : null}
+                    activeOpacity={item.enabled ? 0.7 : 1}
+                  >
+                    <View style={[styles.menuIcon, !item.enabled && styles.menuIconDim]}>
+                      <Ionicons name={item.icon} size={18} color={item.enabled ? Colors.primary : Colors.textMuted} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.menuLabel, !item.enabled && styles.menuLabelDim]}>{item.label}</Text>
+                      <Text style={styles.menuSub}>{item.sub}</Text>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={15}
+                      color={item.enabled ? Colors.textMuted : Colors.border}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ))}
+
+          {/* Saved Academies */}
+          {favorites.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Saved Academies</Text>
+              <View style={styles.menuCard}>
+                {favorites.slice(0, 3).map((academy, idx) => {
+                  const sport = academy.programs?.[0]?.sportType ?? ''
+                  const sportColor = SportColors[sport] ?? Colors.primary
+                  return (
+                    <TouchableOpacity
+                      key={academy.id}
+                      style={[styles.menuItem, idx < Math.min(favorites.length, 3) - 1 && styles.menuItemBorder]}
+                      onPress={() => navigation.navigate('AcademyDetail', { academy })}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.menuIcon, { backgroundColor: sportColor + '15' }]}>
+                        <Text style={{ fontSize: 16 }}>{SPORT_ICONS[sport] ?? '🏅'}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.menuLabel} numberOfLines={1}>{academy.name}</Text>
+                        <Text style={styles.menuSub}>{sport} · {academy.city}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => toggleFavorite(academy)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="heart" size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  )
+                })}
+                {favorites.length > 3 && (
+                  <TouchableOpacity
+                    style={[styles.menuItem, { justifyContent: 'center' }]}
+                    onPress={() => navigation.navigate('Search')}
+                  >
+                    <Text style={{ fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold }}>
+                      +{favorites.length - 3} more saved academies
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Sign out */}
+          <View style={styles.section}>
+            <TouchableOpacity style={styles.logoutBtn} onPress={confirmLogout}>
+              <View style={styles.logoutIcon}>
+                <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
+              </View>
+              <Text style={styles.logoutText}>Sign Out</Text>
+              <Ionicons name="chevron-forward" size={15} color={Colors.danger} />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.version}>SportNexus v2.0.0</Text>
+        </View>
+      </ScrollView>
+
+      {/* Web confirm dialog */}
+      {showLogout && (
+        <Modal transparent animationType="fade" onRequestClose={() => setShowLogout(false)}>
+          <View style={styles.overlay}>
+            <View style={styles.dialog}>
+              <View style={styles.dialogIcon}>
+                <Ionicons name="log-out-outline" size={28} color={Colors.danger} />
+              </View>
+              <Text style={styles.dialogTitle}>Sign Out?</Text>
+              <Text style={styles.dialogMsg}>You'll need to sign in again to access your enrollments.</Text>
+              <View style={styles.dialogBtns}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowLogout(false)}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.confirmLogoutBtn} onPress={() => { setShowLogout(false); logout() }}>
+                  <Text style={styles.confirmLogoutText}>Sign Out</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+    </>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+
+  hero:    { alignItems: 'center', paddingTop: 56, paddingBottom: 28, paddingHorizontal: 20, overflow: 'hidden' },
+  heroBg:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: Colors.navy, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+  avatarWrap: { alignItems: 'center', marginBottom: 12 },
+  avatar:  { width: 88, height: 88, borderRadius: 44, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.2)', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 12 },
+  avatarText: { fontSize: 30, fontWeight: FontWeight.extrabold, color: '#fff' },
+  roleBadge:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: BorderRadius.full },
+  roleText:   { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  name:    { fontSize: FontSize.xl, fontWeight: FontWeight.extrabold, color: '#fff', letterSpacing: -0.3 },
+  contact: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.55)', marginTop: 4 },
+
+  statsRow:    { flexDirection: 'row', marginTop: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: BorderRadius.xl, padding: 4, width: '100%' },
+  statItem:    { flex: 1, alignItems: 'center', paddingVertical: 12 },
+  statValue:   { fontSize: FontSize.xl, fontWeight: FontWeight.extrabold, color: '#fff' },
+  statLabel:   { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.5)', marginTop: 2, fontWeight: FontWeight.medium },
+  statDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 8 },
+
+  menuArea:     { paddingHorizontal: 16, marginTop: 20 },
+  section:      { marginBottom: 6 },
+  sectionTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8, paddingLeft: 4 },
+  menuCard:     { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, overflow: 'hidden', ...Shadow.sm },
+  menuItem:     { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+  menuItemBorder:{ borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  menuIcon:     { width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.tealXLight, alignItems: 'center', justifyContent: 'center' },
+  menuIconDim:  { backgroundColor: Colors.borderLight },
+  menuLabel:    { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.textPrimary },
+  menuLabelDim: { color: Colors.textMuted },
+  menuSub:      { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 1 },
+
+  logoutBtn:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FEF2F2', borderRadius: BorderRadius.xl, padding: 16, borderWidth: 1, borderColor: '#FECACA', marginTop: 8 },
+  logoutIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+  logoutText: { flex: 1, fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.danger },
+
+  version: { textAlign: 'center', fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 20, marginBottom: 4 },
+
+  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  dialog:     { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: 24, width: '100%', maxWidth: 320, alignItems: 'center', gap: 8, ...Shadow.md },
+  dialogIcon: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  dialogTitle:{ fontSize: FontSize.xl, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
+  dialogMsg:  { fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  dialogBtns: { flexDirection: 'row', gap: 10, marginTop: 8, width: '100%' },
+  cancelBtn:  { flex: 1, paddingVertical: 13, borderRadius: BorderRadius.lg, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center' },
+  cancelBtnText: { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.textPrimary },
+  confirmLogoutBtn: { flex: 1, paddingVertical: 13, borderRadius: BorderRadius.lg, backgroundColor: Colors.danger, alignItems: 'center' },
+  confirmLogoutText:{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: '#fff' },
+})

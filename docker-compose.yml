@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sportnexus_postgres
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_DB: sportnexus
+      POSTGRES_USER: sportnexus
+      POSTGRES_PASSWORD: password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sportnexus -d sportnexus']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: sportnexus_redis
+    ports:
+      - '6379:6379'
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: sportnexus_api
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: postgresql://sportnexus:password@postgres:5432/sportnexus
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-change-in-production-min-32-chars
+      NODE_ENV: development
+      PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:
