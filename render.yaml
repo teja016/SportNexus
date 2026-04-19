@@ -3,8 +3,8 @@ services:
     name: sportnexus-api
     runtime: node
     region: singapore
-    buildCommand: npm ci && npx prisma generate --schema=packages/db/prisma/schema.prisma && npx prisma db push --schema=packages/db/prisma/schema.prisma
-    startCommand: npm run start --workspace=apps/api
+    buildCommand: npm ci && npx prisma generate --schema=packages/db/prisma/schema.prisma
+    startCommand: npx prisma db push --schema=packages/db/prisma/schema.prisma && npm run start --workspace=apps/api
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
