@@ -39,6 +39,7 @@ services:
     name: sportnexus-redis
     plan: free
     maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
 
 databases:
   - name: sportnexus-db
