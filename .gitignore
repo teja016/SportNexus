@@ -1,6 +1,11 @@
 node_modules/
 dist/
 .next/
+
+# Android Gradle cache (generated, not needed in VCS)
+apps/mobile/android/.gradle/
+apps/mobile/android/app/build/
+apps/mobile/android/build/
 .expo/
 .expo-shared/
 web-build/

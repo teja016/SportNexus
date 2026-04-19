@@ -12,7 +12,9 @@
       "backgroundColor": "#0D9488"
     },
     "scheme": "sportshub",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.sportnexus.app"
@@ -22,7 +24,11 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0D9488"
       },
-      "package": "com.sportnexus.app"
+      "package": "com.sportnexus.app",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,6 +41,12 @@
           "color": "#0D9488"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e5905a25-92ec-40bf-92ef-8c43564390f2"
+      }
+    },
+    "owner": "teja016"
   }
 }
