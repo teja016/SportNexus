@@ -2,7 +2,8 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '@sportnexus/db'
 import { requireAuth } from '../plugins/auth'
-import { ForbiddenError, NotFoundError } from '../errors'
+import { ForbiddenError, NotFoundError, ConflictError } from '../errors'
+import { notificationQueue } from '../workers/notificationWorker'
 
 const createSessionSchema = z.object({
   enrollmentId: z.string().min(1),
@@ -12,14 +13,16 @@ const createSessionSchema = z.object({
 })
 
 const updateStatusSchema = z.object({
-  status: z.enum(['SCHEDULED', 'DISPATCHED', 'ARRIVING', 'PICKED_UP', 'AT_ACADEMY', 'COMPLETED']),
+  status: z.enum([
+    'SCHEDULED', 'DISPATCHED', 'ARRIVING', 'PICKED_UP',
+    'AT_ACADEMY', 'COMPLETED', 'CANCELLED_BY_USER',
+  ]),
 })
 
 export default async function transitRoutes(fastify: FastifyInstance) {
   // GET /api/transit/today
   fastify.get('/today', { preHandler: requireAuth }, async (request, reply) => {
     const { id: userId } = request.user as { id: string }
-
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const tomorrow = new Date(today)
@@ -70,14 +73,11 @@ export default async function transitRoutes(fastify: FastifyInstance) {
   // POST /api/transit — create session (operator)
   fastify.post('/', async (request, reply) => {
     const body = createSessionSchema.parse(request.body)
-
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
     const session = await prisma.transitSession.upsert({
-      where: {
-        enrollmentId_date: { enrollmentId: body.enrollmentId, date: today },
-      },
+      where: { enrollmentId_date: { enrollmentId: body.enrollmentId, date: today } },
       update: {
         driverName: body.driverName,
         driverPhone: body.driverPhone,
@@ -103,9 +103,48 @@ export default async function transitRoutes(fastify: FastifyInstance) {
 
     const session = await prisma.transitSession.update({
       where: { id },
-      data: { status: body.status },
+      data: {
+        status: body.status,
+        ...(body.status === 'CANCELLED_BY_USER' ? { cancelledAt: new Date() } : {}),
+      },
     })
 
     return reply.send({ success: true, data: session })
+  })
+
+  // POST /api/transit/:id/cancel-today — user cancels their transport for today
+  fastify.post('/:id/cancel-today', { preHandler: requireAuth }, async (request, reply) => {
+    const { id: userId } = request.user as { id: string }
+    const { id } = request.params as { id: string }
+
+    const session = await prisma.transitSession.findUnique({
+      where: { id },
+      include: {
+        enrollment: { include: { user: { select: { id: true, fcmToken: true } } } },
+      },
+    })
+
+    if (!session) throw new NotFoundError('Transit session')
+    if (session.enrollment.userId !== userId) throw new ForbiddenError()
+
+    if (['PICKED_UP', 'AT_ACADEMY', 'COMPLETED', 'CANCELLED_BY_USER'].includes(session.status)) {
+      throw new ConflictError('Cannot cancel — transport already in progress or completed', 'CANNOT_CANCEL')
+    }
+
+    const updated = await prisma.transitSession.update({
+      where: { id },
+      data: { status: 'CANCELLED_BY_USER', cancelledAt: new Date() },
+    })
+
+    // Notify user of cancellation confirmation
+    if (session.enrollment.user.fcmToken) {
+      await notificationQueue.add('ride_cancelled', {
+        userId:    userId,
+        type:      'ride_cancelled',
+        sessionId: id,
+      }).catch(() => {/* non-fatal */})
+    }
+
+    return reply.send({ success: true, data: updated })
   })
 }

@@ -11,12 +11,14 @@ interface EnrollmentState {
   pickupLat: number | null
   pickupLng: number | null
   pickupDistance: number
+  startDate: Date | null
 
   setAcademy: (academy: Academy) => void
   setProgram: (program: SportProgram) => void
   setSlots: (slots: Slot[]) => void
   setDuration: (months: number) => void
   setTransport: (opted: boolean, address?: string, lat?: number, lng?: number, distance?: number) => void
+  setStartDate: (date: Date) => void
   reset: () => void
 }
 
@@ -30,6 +32,7 @@ const initialState = {
   pickupLat: null,
   pickupLng: null,
   pickupDistance: 0,
+  startDate: null,
 }
 
 export const useEnrollmentStore = create<EnrollmentState>()((set) => ({
@@ -48,6 +51,8 @@ export const useEnrollmentStore = create<EnrollmentState>()((set) => ({
       pickupLng: lng ?? null,
       pickupDistance: distance ?? 0,
     }),
+
+  setStartDate: (date) => set({ startDate: date }),
 
   reset: () => set(initialState),
 }))

@@ -16,15 +16,23 @@ notificationQueue.on('error', (err) => {
 })
 
 const NOTIFICATION_MESSAGES: Record<string, { title: string; body: string }> = {
-  slot_reminder:           { title: 'Training Reminder', body: 'Your training session starts in 1 hour' },
-  vehicle_arriving:        { title: 'Vehicle On Its Way', body: 'Your vehicle is on its way to pick you up' },
-  pickup_started:          { title: 'Vehicle Nearby', body: 'Your vehicle is arriving at the pickup point' },
-  in_transit:              { title: 'En Route', body: "You're on your way to the academy" },
-  arrived:                 { title: 'Arriving Soon', body: 'Arriving at the academy in 5 minutes' },
-  return_vehicle_arriving: { title: 'Return Vehicle Ready', body: 'Your return vehicle is on its way' },
-  return_pickup:           { title: 'Return Pickup', body: 'Return pickup has started' },
-  return_transit:          { title: 'Heading Home', body: "You're on your way back home" },
-  return_arrived:          { title: 'Home Safe', body: "You've reached home safely" },
+  // Time-scheduled (fired by dailyTransitWorker)
+  slot_reminder:           { title: 'Training Reminder 🏆',   body: 'Your training session starts in 1 hour' },
+  vehicle_arriving:        { title: 'Vehicle Coming Soon 🚌',  body: 'Your pickup vehicle will arrive in 30 minutes' },
+  pickup_started:          { title: 'Vehicle Nearby 📍',       body: 'Your vehicle is almost at the pickup point' },
+  in_transit:              { title: 'En Route 🛣️',             body: "You're on your way to the academy" },
+  arrived:                 { title: 'Almost There! 🏫',        body: 'Arriving at the academy in 5 minutes' },
+  return_vehicle_arriving: { title: 'Return Vehicle Ready 🚌', body: 'Your return vehicle is on its way home' },
+  return_pickup:           { title: 'Return Pickup Started 🏠', body: 'Return pickup has started' },
+  return_transit:          { title: 'Heading Home 🏡',          body: "You're on your way back home" },
+  return_arrived:          { title: 'Home Safe ✅',             body: "You've reached home safely. See you tomorrow!" },
+  // Status-triggered (fired by socket status changes)
+  driver_dispatched:       { title: 'Driver Assigned 🚗',      body: 'Your driver has been assigned and is heading to you' },
+  driver_arriving:         { title: 'Driver Arriving Soon 📍',  body: 'Your vehicle is almost at your pickup location' },
+  ride_picked_up:          { title: "You're On Board 🎒",       body: 'Picked up! Heading to the academy now' },
+  ride_at_academy:         { title: 'Arrived at Academy 🏫',   body: "You've arrived. Have a great training session!" },
+  ride_completed:          { title: 'Session Complete ✅',      body: "Today's transport is complete. Well done!" },
+  ride_cancelled:          { title: 'Transport Cancelled',      body: "Today's transport has been cancelled" },
 }
 
 let worker: Worker | null = null

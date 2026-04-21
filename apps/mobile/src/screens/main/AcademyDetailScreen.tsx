@@ -29,7 +29,7 @@ export default function AcademyDetailScreen({ route, navigation }: any) {
   const { data, isLoading } = useQuery({
     queryKey: ['academy', initialAcademy.id],
     queryFn:  () => academyAPI.getById(initialAcademy.id),
-    initialData: initialAcademy,
+    placeholderData: initialAcademy,
     staleTime: 0,
   })
 
@@ -42,7 +42,8 @@ export default function AcademyDetailScreen({ route, navigation }: any) {
   })
 
   function openDirections() {
-    Linking.openURL(`https://maps.google.com/?q=${academy.lat},${academy.lng}`)
+    const query = encodeURIComponent(`${academy.name}, ${academy.address}, ${academy.city}`)
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`)
   }
 
   function handleViewSlots(program: SportProgram) {

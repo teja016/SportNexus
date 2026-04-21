@@ -66,6 +66,16 @@ export default function BookingSuccessScreen({ route, navigation }: any) {
     })
   }
 
+  function handleViewEnrollment() {
+    navigation.reset({
+      index: 1,
+      routes: [
+        { name: 'MainTabs' },
+        { name: 'EnrollmentDetail', params: { enrollmentId } },
+      ],
+    })
+  }
+
   function handleDone() {
     navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] })
   }
@@ -129,18 +139,21 @@ export default function BookingSuccessScreen({ route, navigation }: any) {
       <Animated.View style={[styles.actions, { opacity: cardOpacity, transform: [{ translateY: cardSlide }] }]}>
         <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
           <Ionicons name="share-social-outline" size={18} color={Colors.primary} />
-          <Text style={styles.shareBtnText}>Share Booking</Text>
+          <Text style={styles.shareBtnText}>Share</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.doneBtn} onPress={handleDone}>
-          <Text style={styles.doneBtnText}>Done</Text>
-          <Ionicons name="arrow-forward" size={18} color="#fff" />
+        <TouchableOpacity style={styles.viewBtn} onPress={handleViewEnrollment}>
+          <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+          <Text style={styles.viewBtnText}>View Enrollment</Text>
         </TouchableOpacity>
       </Animated.View>
 
-      <Animated.Text style={[styles.hint, { opacity: cardOpacity }]}>
-        You can view your enrollment in the My Enrollments tab
-      </Animated.Text>
+      <Animated.View style={[{ width: '100%', opacity: cardOpacity, transform: [{ translateY: cardSlide }] }]}>
+        <TouchableOpacity style={styles.doneBtn} onPress={handleDone}>
+          <Text style={styles.doneBtnText}>Done — Back to Home</Text>
+          <Ionicons name="home-outline" size={18} color="#fff" />
+        </TouchableOpacity>
+      </Animated.View>
     </ScrollView>
   )
 }
@@ -186,9 +199,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14, borderRadius: BorderRadius.lg,
     borderWidth: 1.5, borderColor: Colors.primary, backgroundColor: Colors.tealXLight,
   },
-  shareBtnText: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.primary },
+  shareBtnText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.primary },
+  viewBtn: {
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 14, borderRadius: BorderRadius.lg,
+    borderWidth: 1.5, borderColor: Colors.primary, backgroundColor: Colors.tealXLight,
+  },
+  viewBtnText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.primary },
   doneBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 14, borderRadius: BorderRadius.lg,
     backgroundColor: Colors.primary, shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 10,
   },

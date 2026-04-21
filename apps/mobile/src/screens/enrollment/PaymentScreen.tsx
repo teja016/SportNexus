@@ -3,41 +3,46 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, AppState, AppStateStatus, Linking, Modal, Alert,
 } from 'react-native'
+import QRCode from 'react-native-qrcode-svg'
 import { Ionicons } from '@expo/vector-icons'
 import { enrollmentAPI, paymentAPI } from '../../services/api'
 import { useEnrollmentStore } from '../../store/enrollmentStore'
 import { useAuthStore } from '../../store/authStore'
 import { useLocalEnrollmentsStore } from '../../store/localEnrollmentsStore'
-import { formatCurrency, calculateTrainingFee, calculateTransportFee } from '@sportnexus/utils'
+import { formatCurrency, calculateTrainingFee, calculateTransportFee, calculateProratedTransportFee } from '@sportnexus/utils'
 import { Colors, FontSize, FontWeight, BorderRadius, Shadow } from '../../constants/theme'
 
 const MERCHANT_UPI_ID = '6303253214icic@ybl'
 const MERCHANT_NAME   = 'SportNexus'
 
 const PAYMENT_METHODS = [
-  { id: 'upi',        label: 'UPI',                  icon: 'phone-portrait-outline', desc: 'GPay · PhonePe · BHIM · Paytm' },
+  { id: 'upi',        label: 'UPI',                  icon: 'phone-portrait-outline', desc: 'Scan QR · GPay · PhonePe · Paytm' },
   { id: 'card',       label: 'Credit / Debit Card',  icon: 'card-outline',           desc: 'Visa, Mastercard, Rupay' },
   { id: 'netbanking', label: 'Net Banking',           icon: 'business-outline',       desc: 'All major banks' },
 ]
 
 export default function PaymentScreen({ navigation }: any) {
   const { selectedAcademy, selectedProgram, selectedSlots, durationMonths,
-          transportOpted, pickupDistance, reset } = useEnrollmentStore()
+          transportOpted, pickupDistance, startDate, reset } = useEnrollmentStore()
   const { addEnrollment } = useLocalEnrollmentsStore()
 
   const [selectedMethod, setSelectedMethod]   = useState('upi')
   const [loading, setLoading]                 = useState(false)
   const [error, setError]                     = useState('')
+  const [showQR, setShowQR]                   = useState(false)
   const [showConfirm, setShowConfirm]         = useState(false)
   const [pendingEnrollId, setPendingEnrollId] = useState<string | null>(null)
   const [pendingPayId, setPendingPayId]       = useState<string | null>(null)
+  const [upiString, setUpiString]             = useState('')
   const waitingForUPI = useRef(false)
 
   const trainingFee  = selectedProgram
     ? calculateTrainingFee(selectedProgram.feeMonthly, selectedSlots.length || 1, durationMonths)
     : 0
   const transportFee = transportOpted && pickupDistance > 0
-    ? calculateTransportFee(pickupDistance, durationMonths)
+    ? startDate
+      ? calculateProratedTransportFee(startDate, durationMonths, pickupDistance).total
+      : calculateTransportFee(pickupDistance, durationMonths)
     : 0
   const totalFee = trainingFee + transportFee
 
@@ -46,6 +51,7 @@ export default function PaymentScreen({ navigation }: any) {
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
       if (next === 'active' && waitingForUPI.current) {
         waitingForUPI.current = false
+        setShowQR(false)
         setShowConfirm(true)
       }
     })
@@ -84,6 +90,7 @@ export default function PaymentScreen({ navigation }: any) {
           pickupLat:      state.pickupLat ?? undefined,
           pickupLng:      state.pickupLng ?? undefined,
           pickupDistance: state.pickupDistance || undefined,
+          startDate:      state.startDate ? state.startDate.toISOString() : undefined,
         })
         if (enrollRes?.id) {
           enrollmentId = enrollRes.id
@@ -95,34 +102,40 @@ export default function PaymentScreen({ navigation }: any) {
       setPendingEnrollId(enrollmentId)
       setPendingPayId(orderId ?? null)
 
-      // Build UPI deep link
+      // Build UPI string for QR code — no amount in the QR so bank always treats it as standard scan
+      // User manually types the amount in their UPI app (avoids "collect" security block)
       const note = `SportNexus-${enrollmentId.slice(-8).toUpperCase()}`
-      const upiUrl =
+      const qrUpiString =
         `upi://pay?pa=${MERCHANT_UPI_ID}` +
         `&pn=${encodeURIComponent(MERCHANT_NAME)}` +
-        `&am=${totalFee.toFixed(2)}` +
         `&cu=INR` +
         `&tn=${encodeURIComponent(note)}`
 
-      waitingForUPI.current = true
+      setUpiString(qrUpiString)
       setLoading(false)
-      try {
-        await Linking.openURL(upiUrl)
-      } catch {
-        waitingForUPI.current = false
-        Alert.alert(
-          'Open UPI App',
-          `Please open any UPI app (GPay / PhonePe / Paytm) and pay:\n\n₹${totalFee.toFixed(2)} → ${MERCHANT_UPI_ID}\n\nRef: ${note}\n\nThen tap "I've Paid" to confirm.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: "I've Paid", onPress: () => { setPendingEnrollId(enrollmentId); setShowConfirm(true) } },
-          ]
-        )
-      }
+      setShowQR(true)
     } catch (err: any) {
       setLoading(false)
       setError(err.response?.data?.error?.message ?? err.message ?? 'Payment failed. Please try again.')
     }
+  }
+
+  async function handleOpenUpiApp() {
+    if (!upiString) return
+    // Deep link with amount for convenience — may or may not work depending on UPI app
+    const upiWithAmount = upiString + `&am=${totalFee.toFixed(2)}`
+    waitingForUPI.current = true
+    try {
+      await Linking.openURL(upiWithAmount)
+    } catch {
+      waitingForUPI.current = false
+      Alert.alert('Could not open UPI app', 'Please scan the QR code from your UPI app instead.')
+    }
+  }
+
+  function handleQRPaid() {
+    setShowQR(false)
+    setShowConfirm(true)
   }
 
   async function handleConfirmPaid() {
@@ -131,7 +144,6 @@ export default function PaymentScreen({ navigation }: any) {
     setLoading(true)
 
     try {
-      // Confirm with the API if it's a real enrollment
       if (!pendingEnrollId.startsWith('demo_')) {
         await paymentAPI.confirm({
           enrollmentId: pendingEnrollId,
@@ -139,7 +151,6 @@ export default function PaymentScreen({ navigation }: any) {
         })
       }
 
-      // Save locally
       const slot = selectedSlots[0]
       addEnrollment({
         id: pendingEnrollId,
@@ -186,6 +197,7 @@ export default function PaymentScreen({ navigation }: any) {
 
   function handleNotPaid() {
     setShowConfirm(false)
+    setShowQR(false)
     setPendingEnrollId(null)
     setPendingPayId(null)
     setError('Payment not completed. Please try again.')
@@ -236,7 +248,7 @@ export default function PaymentScreen({ navigation }: any) {
         {selectedMethod === 'upi' && (
           <View style={styles.upiCard}>
             <View style={styles.upiIconWrap}>
-              <Ionicons name="phone-portrait" size={22} color={Colors.primary} />
+              <Ionicons name="qr-code-outline" size={22} color={Colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.upiTitle}>Pay to SportNexus</Text>
@@ -284,7 +296,7 @@ export default function PaymentScreen({ navigation }: any) {
 
         <View style={styles.secureNote}>
           <Ionicons name="shield-checkmark-outline" size={14} color={Colors.accent} />
-          <Text style={styles.secureText}>100% secure · UPI payments go directly to merchant</Text>
+          <Text style={styles.secureText}>100% secure · Scan QR from any UPI app</Text>
         </View>
       </ScrollView>
 
@@ -298,12 +310,60 @@ export default function PaymentScreen({ navigation }: any) {
           {loading
             ? <ActivityIndicator color="#fff" />
             : <>
-                <Ionicons name="phone-portrait-outline" size={16} color="#fff" />
+                <Ionicons name="qr-code-outline" size={16} color="#fff" />
                 <Text style={styles.payBtnText}>Pay via UPI</Text>
               </>
           }
         </TouchableOpacity>
       </View>
+
+      {/* QR Code Modal */}
+      <Modal visible={showQR} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.qrCard}>
+            <View style={styles.qrHeader}>
+              <Text style={styles.qrTitle}>Scan & Pay</Text>
+              <TouchableOpacity onPress={handleNotPaid} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.qrAmountLabel}>Amount to pay</Text>
+            <Text style={styles.qrAmount}>{formatCurrency(totalFee)}</Text>
+
+            <View style={styles.qrWrap}>
+              {upiString ? (
+                <QRCode
+                  value={upiString}
+                  size={200}
+                  color={Colors.navy}
+                  backgroundColor="#fff"
+                />
+              ) : null}
+            </View>
+
+            <Text style={styles.qrInstructions}>
+              Open GPay, PhonePe, Paytm or any UPI app → Scan QR → Enter amount {formatCurrency(totalFee)}
+            </Text>
+
+            <View style={styles.qrUpiRow}>
+              <Ionicons name="person-circle-outline" size={16} color={Colors.primary} />
+              <Text style={styles.qrUpiId}>{MERCHANT_UPI_ID}</Text>
+            </View>
+
+            {/* Open UPI app button — secondary option */}
+            <TouchableOpacity style={styles.openUpiBtn} onPress={handleOpenUpiApp}>
+              <Ionicons name="phone-portrait-outline" size={16} color={Colors.primary} />
+              <Text style={styles.openUpiBtnText}>Open UPI App Instead</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.paidBtn} onPress={handleQRPaid}>
+              <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+              <Text style={styles.paidBtnText}>I've Paid</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Payment Confirmation Modal */}
       <Modal visible={showConfirm} transparent animationType="fade">
@@ -377,8 +437,23 @@ const styles = StyleSheet.create({
   payBtn:       { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 14, borderRadius: BorderRadius.lg, justifyContent: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
   payBtnText:   { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.extrabold },
 
+  // QR Modal
+  qrCard:       { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: 24, width: '100%', alignItems: 'center', ...Shadow.lg },
+  qrHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 12 },
+  qrTitle:      { fontSize: FontSize.xl, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
+  qrAmountLabel:{ fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: 2 },
+  qrAmount:     { fontSize: 28, fontWeight: FontWeight.extrabold, color: Colors.navy, marginBottom: 16 },
+  qrWrap:       { backgroundColor: '#fff', padding: 16, borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: Colors.borderLight, marginBottom: 16, ...Shadow.sm },
+  qrInstructions: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 10, paddingHorizontal: 8 },
+  qrUpiRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.tealXLight, borderRadius: BorderRadius.md, paddingHorizontal: 14, paddingVertical: 8, marginBottom: 16 },
+  qrUpiId:      { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.bold },
+  openUpiBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: BorderRadius.lg, paddingVertical: 12, paddingHorizontal: 20, marginBottom: 10, width: '100%', justifyContent: 'center' },
+  openUpiBtnText: { fontSize: FontSize.base, color: Colors.primary, fontWeight: FontWeight.semibold },
+  paidBtn:      { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.primary, borderRadius: BorderRadius.lg, paddingVertical: 14, width: '100%', justifyContent: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  paidBtnText:  { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
+
   // Confirmation Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'flex-end', padding: 16, paddingBottom: 24 },
   modalCard:    { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, padding: 28, width: '100%', alignItems: 'center', ...Shadow.lg },
   modalIconWrap:{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   modalTitle:   { fontSize: FontSize.xl, fontWeight: FontWeight.extrabold, color: Colors.textPrimary, marginBottom: 8 },

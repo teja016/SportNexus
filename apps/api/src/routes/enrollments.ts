@@ -3,6 +3,9 @@ import { z } from 'zod'
 import { prisma } from '@sportnexus/db'
 import { requireAuth } from '../plugins/auth'
 import { ConflictError, ForbiddenError, NotFoundError } from '../errors'
+import { enrollmentExpiryQueue } from '../workers/enrollmentExpiryWorker'
+
+const PAYMENT_WINDOW_MS = 10 * 60 * 1000 // 10 minutes
 
 const createEnrollmentSchema = z.object({
   slotId: z.string().min(1),
@@ -12,6 +15,7 @@ const createEnrollmentSchema = z.object({
   pickupAddress: z.string().optional(),
   pickupDistance: z.number().optional(),
   durationMonths: z.number().int().min(1).max(12).default(1),
+  startDate: z.string().datetime().optional(),
 })
 
 const listQuerySchema = z.object({
@@ -41,6 +45,13 @@ export default async function enrollmentRoutes(fastify: FastifyInstance) {
         throw new ConflictError('You are already enrolled in this slot', 'DUPLICATE_ENROLLMENT')
       }
 
+      // Compute start/end dates
+      const startDate = body.startDate ? new Date(body.startDate) : null
+      let endDate: Date | null = null
+      if (startDate) {
+        endDate = new Date(startDate.getFullYear(), startDate.getMonth() + body.durationMonths, 0)
+      }
+
       // Create enrollment
       const newEnrollment = await tx.enrollment.create({
         data: {
@@ -52,6 +63,8 @@ export default async function enrollmentRoutes(fastify: FastifyInstance) {
           pickupAddress: body.pickupAddress,
           pickupDistance: body.pickupDistance,
           durationMonths: body.durationMonths,
+          startDate,
+          endDate,
           status: 'PENDING',
         },
         include: {
@@ -70,7 +83,22 @@ export default async function enrollmentRoutes(fastify: FastifyInstance) {
       return newEnrollment
     })
 
-    return reply.code(201).send({ success: true, data: enrollment })
+    // Schedule auto-cancellation after 10 minutes if payment not completed
+    try {
+      await enrollmentExpiryQueue.add(
+        'expire',
+        { enrollmentId: enrollment.id },
+        { delay: PAYMENT_WINDOW_MS }
+      )
+    } catch (err) {
+      // Non-fatal — Redis may be unavailable in dev
+      console.warn('[Enrollments] Could not schedule expiry job (non-fatal):', err)
+    }
+
+    return reply.code(201).send({
+      success: true,
+      data: { ...enrollment, paymentWindowMinutes: 10 },
+    })
   })
 
   // GET /api/enrollments/me
@@ -130,10 +158,13 @@ export default async function enrollmentRoutes(fastify: FastifyInstance) {
       }
 
       await tx.enrollment.update({ where: { id }, data: { status: 'CANCELLED' } })
-      await tx.slot.update({
-        where: { id: enrollment.slotId },
-        data: { enrolledCount: { decrement: 1 } },
-      })
+      // Only decrement if the slot count was already incremented for this enrollment
+      if (['PENDING', 'CONFIRMED', 'ACTIVE'].includes(enrollment.status)) {
+        await tx.slot.update({
+          where: { id: enrollment.slotId },
+          data: { enrolledCount: { decrement: 1 } },
+        })
+      }
     })
 
     return reply.code(204).send()

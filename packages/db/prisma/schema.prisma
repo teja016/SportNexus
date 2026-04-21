@@ -38,6 +38,7 @@ enum TransitStatus {
   PICKED_UP
   AT_ACADEMY
   COMPLETED
+  CANCELLED_BY_USER
 }
 
 // ─── Models ──────────────────────────────────────────────────────────────────
@@ -170,6 +171,8 @@ model Enrollment {
   pickupAddress  String?
   pickupDistance Float?
   durationMonths Int              @default(1)
+  startDate      DateTime?
+  endDate        DateTime?
   status         EnrollmentStatus @default(PENDING)
   enrolledAt     DateTime         @default(now())
   expiresAt      DateTime?
@@ -233,11 +236,13 @@ model TransitSession {
   driverLat     Float?
   driverLng     Float?
   etaMinutes    Int?
-  driverName    String?
-  driverPhone   String?
-  vehicleNumber String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  driverName     String?
+  driverPhone    String?
+  vehicleNumber  String?
+  userConfirmed  Boolean       @default(false)
+  cancelledAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
 

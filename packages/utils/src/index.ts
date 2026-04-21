@@ -56,7 +56,9 @@ export function calculateDistance(
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
     Math.sin(dLng / 2) * Math.sin(dLng / 2)
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return Math.round(R * c * 10) / 10
+  const aerialKm = R * c
+  // Road correction factor: actual road distance is ~1.35× aerial in Indian cities
+  return Math.round(aerialKm * 1.35 * 10) / 10
 }
 
 function toRad(deg: number): number {
@@ -152,4 +154,84 @@ export function calculateTotalFee(
   const training = calculateTrainingFee(feeMonthly, numberOfSlots, durationMonths)
   const transport = transportOpted ? calculateTransportFee(distanceKm, durationMonths) : 0
   return training + transport
+}
+
+// ─── Prorated Transport Fee ───────────────────────────────────────────────────
+
+export interface TransportFeeBreakdownItem {
+  label: string
+  days: number
+  fee: number
+}
+
+export interface TransportFeeBreakdown {
+  items: TransportFeeBreakdownItem[]
+  total: number
+  endDate: Date
+}
+
+function countWorkingDays(start: Date, end: Date): number {
+  let count = 0
+  const d = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const last = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  while (d <= last) {
+    if (d.getDay() !== 0) count++ // exclude Sundays
+    d.setDate(d.getDate() + 1)
+  }
+  return count
+}
+
+/**
+ * Prorated transport fee:
+ * - First partial month: count Mon–Sat days from startDate to last day of that month
+ * - Subsequent months: full calendar month Mon–Sat days
+ * Returns per-month breakdown + total + endDate.
+ */
+export function calculateProratedTransportFee(
+  startDate: Date,
+  durationMonths: number,
+  distanceKm: number
+): TransportFeeBreakdown {
+  const dailyRate = distanceKm * 2 * TRANSPORT_RATE_PER_KM
+  const items: TransportFeeBreakdownItem[] = []
+  const isFirstDayOfMonth = startDate.getDate() === 1
+
+  for (let i = 0; i < durationMonths; i++) {
+    const year  = startDate.getFullYear()
+    const month = startDate.getMonth() + i
+
+    let periodStart: Date
+    let periodEnd: Date
+
+    if (i === 0 && !isFirstDayOfMonth) {
+      // Partial first month
+      periodStart = new Date(startDate)
+      periodEnd   = new Date(year, month + 1, 0) // last day of start month
+    } else {
+      // Full calendar month
+      const absMonth = ((month % 12) + 12) % 12
+      const absYear  = year + Math.floor(month / 12)
+      periodStart = new Date(absYear, absMonth, 1)
+      periodEnd   = new Date(absYear, absMonth + 1, 0)
+    }
+
+    const days = countWorkingDays(periodStart, periodEnd)
+    const fee  = Math.round(days * dailyRate)
+
+    const fmt = (d: Date) =>
+      d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+
+    const isPartial = i === 0 && !isFirstDayOfMonth
+    const label = isPartial
+      ? `${fmt(periodStart)} – ${fmt(periodEnd)} (partial)`
+      : periodStart.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+
+    items.push({ label, days, fee })
+  }
+
+  const lastMonth  = startDate.getMonth() + durationMonths
+  const endDate    = new Date(startDate.getFullYear(), lastMonth, 0)
+  const total      = items.reduce((s, it) => s + it.fee, 0)
+
+  return { items, total, endDate }
 }

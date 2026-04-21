@@ -169,8 +169,9 @@ export const paymentAPI = {
 // ─── Transit API ──────────────────────────────────────────────────────────────
 
 export const transitAPI = {
-  getToday: () => api.get('/transit/today').then((r) => r.data.data),
-  getById: (id: string) => api.get(`/transit/${id}`).then((r) => r.data.data),
+  getToday:    ()          => api.get('/transit/today').then((r) => r.data.data),
+  getById:     (id: string) => api.get(`/transit/${id}`).then((r) => r.data.data),
+  cancelToday: (id: string) => api.post(`/transit/${id}/cancel-today`).then((r) => r.data.data),
 }
 
 export default api
