@@ -70,6 +70,30 @@ export default async function transitRoutes(fastify: FastifyInstance) {
     return reply.send({ success: true, data: session })
   })
 
+  // POST /api/transit/init-session — auto-create today's session for a transport enrollment
+  fastify.post('/init-session', { preHandler: requireAuth }, async (request, reply) => {
+    const { id: userId } = request.user as { id: string }
+    const { enrollmentId } = z.object({ enrollmentId: z.string().min(1) }).parse(request.body)
+
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { slot: true },
+    })
+    if (!enrollment) throw new NotFoundError('Enrollment')
+    if (enrollment.userId !== userId) throw new ForbiddenError()
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const session = await prisma.transitSession.upsert({
+      where: { enrollmentId_date: { enrollmentId, date: today } },
+      update: {},
+      create: { enrollmentId, date: today, status: 'SCHEDULED' },
+    })
+
+    return reply.code(201).send({ success: true, data: session })
+  })
+
   // POST /api/transit — create session (operator)
   fastify.post('/', async (request, reply) => {
     const body = createSessionSchema.parse(request.body)

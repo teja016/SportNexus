@@ -1,132 +1,180 @@
-import React from 'react'
-import { View, Text, StyleSheet } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
-import { Colors, BorderRadius, Shadow } from '../constants/theme'
+import React, { useRef, useEffect } from 'react'
+import { StyleSheet, View, Text } from 'react-native'
+import MapView, { PROVIDER_GOOGLE, Polyline, Marker, Camera } from 'react-native-maps'
 
 interface Props {
   driverLat: number
   driverLng: number
   pickupLat: number
   pickupLng: number
-  destLat: number
-  destLng: number
-  status: string
+  destLat:   number
+  destLng:   number
+  status:    string
   onDriverPress?: () => void
 }
 
-// Pure RN route visualization — no Google Maps API key required
-export default function TrackingMap({ driverLat, driverLng, pickupLat, pickupLng, destLat, destLng, status, onDriverPress }: Props) {
-  const isMoving   = ['ARRIVING', 'PICKED_UP'].includes(status)
-  const isPickedUp = status === 'PICKED_UP' || status === 'AT_ACADEMY' || status === 'COMPLETED'
+// Clean Uber-style map — muted roads, no POI clutter
+const MAP_STYLE = [
+  { featureType: 'poi',              elementType: 'all',      stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit',          elementType: 'all',      stylers: [{ visibility: 'off' }] },
+  { featureType: 'road',             elementType: 'labels',   stylers: [{ visibility: 'simplified' }] },
+  { featureType: 'administrative',   elementType: 'labels',   stylers: [{ visibility: 'off' }] },
+  { featureType: 'landscape',        elementType: 'geometry', stylers: [{ color: '#f5f7fa' }] },
+  { featureType: 'water',            elementType: 'geometry', stylers: [{ color: '#c8d8e8' }] },
+  { featureType: 'road.highway',     elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+  { featureType: 'road.arterial',    elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+  { featureType: 'road.local',       elementType: 'geometry', stylers: [{ color: '#f0f0f0' }] },
+]
+
+export default function TrackingMap({
+  driverLat, driverLng, pickupLat, pickupLng,
+  destLat, destLng, status, onDriverPress,
+}: Props) {
+  const mapRef   = useRef<MapView>(null)
+  const markerRef = useRef<any>(null)
+  const prevLat  = useRef(driverLat)
+  const prevLng  = useRef(driverLng)
+
+  const isPickedUp = ['PICKED_UP', 'AT_ACADEMY', 'COMPLETED'].includes(status)
+
+  // Smoothly animate driver marker to new position
+  useEffect(() => {
+    if (driverLat === prevLat.current && driverLng === prevLng.current) return
+    prevLat.current = driverLat
+    prevLng.current = driverLng
+
+    if (markerRef.current?.animateMarkerToCoordinate) {
+      markerRef.current.animateMarkerToCoordinate(
+        { latitude: driverLat, longitude: driverLng },
+        900
+      )
+    }
+
+    // Keep camera loosely following driver
+    mapRef.current?.animateCamera(
+      { center: { latitude: driverLat, longitude: driverLng }, zoom: 15 },
+      { duration: 900 }
+    )
+  }, [driverLat, driverLng])
+
+  // Initial camera fit — show driver + destination
+  useEffect(() => {
+    setTimeout(() => {
+      mapRef.current?.fitToCoordinates(
+        isPickedUp
+          ? [{ latitude: driverLat, longitude: driverLng }, { latitude: destLat, longitude: destLng }]
+          : [
+              { latitude: driverLat, longitude: driverLng },
+              { latitude: pickupLat, longitude: pickupLng },
+              { latitude: destLat,   longitude: destLng },
+            ],
+        { edgePadding: { top: 80, right: 60, bottom: 320, left: 60 }, animated: true }
+      )
+    }, 600)
+  }, [])
 
   return (
     <View style={styles.container}>
-      {/* Background grid */}
-      <View style={styles.grid}>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <View key={`h${i}`} style={[styles.gridLine, { top: `${(i + 1) * 14}%` as any }]} />
-        ))}
-        {Array.from({ length: 5 }).map((_, i) => (
-          <View key={`v${i}`} style={[styles.gridLineV, { left: `${(i + 1) * 18}%` as any }]} />
-        ))}
-      </View>
-
-      {/* Route line */}
-      <View style={styles.routeLine} />
-
-      {/* Driver marker */}
-      <View style={[styles.markerWrap, isPickedUp ? styles.markerMid : styles.markerLeft, { zIndex: 10 }]}>
-        <View
-          style={[styles.driverMarker, isMoving && styles.driverMarkerActive]}
-          onTouchEnd={onDriverPress}
-        >
-          <Text style={{ fontSize: 22 }}>🚗</Text>
-        </View>
-        <View style={styles.markerPulse} />
-        <View style={styles.markerLabel}>
-          <Text style={styles.markerLabelText}>Driver</Text>
-        </View>
-      </View>
-
-      {/* Pickup marker */}
-      {!isPickedUp && (
-        <View style={[styles.markerWrap, styles.markerMid]}>
-          <View style={[styles.pinMarker, { backgroundColor: Colors.primary }]}>
-            <Ionicons name="person" size={14} color="#fff" />
-          </View>
-          <View style={styles.markerLabel}>
-            <Text style={styles.markerLabelText}>Pickup</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Academy marker */}
-      <View style={[styles.markerWrap, styles.markerRight]}>
-        <View style={[styles.pinMarker, { backgroundColor: Colors.navy }]}>
-          <Ionicons name="school" size={14} color="#fff" />
-        </View>
-        <View style={styles.markerLabel}>
-          <Text style={styles.markerLabelText}>Academy</Text>
-        </View>
-      </View>
-
-      {/* Status overlay */}
-      <View style={styles.statusOverlay}>
-        <Ionicons
-          name={isMoving ? 'navigate' : 'time-outline'}
-          size={14}
-          color={isMoving ? Colors.accent : Colors.textSecondary}
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_GOOGLE}
+        style={styles.map}
+        customMapStyle={MAP_STYLE}
+        showsUserLocation={false}
+        showsMyLocationButton={false}
+        showsCompass={false}
+        showsTraffic={false}
+        toolbarEnabled={false}
+        initialRegion={{
+          latitude:      (driverLat + destLat) / 2,
+          longitude:     (driverLng + destLng) / 2,
+          latitudeDelta:  Math.abs(driverLat - destLat) * 2.5 + 0.02,
+          longitudeDelta: Math.abs(driverLng - destLng) * 2.5 + 0.02,
+        }}
+      >
+        {/* ── Route polyline ───────────────────────────────── */}
+        <Polyline
+          coordinates={
+            isPickedUp
+              ? [{ latitude: driverLat, longitude: driverLng }, { latitude: destLat, longitude: destLng }]
+              : [
+                  { latitude: driverLat, longitude: driverLng },
+                  { latitude: pickupLat, longitude: pickupLng },
+                  { latitude: destLat,   longitude: destLng },
+                ]
+          }
+          strokeColor="#0D9488"
+          strokeWidth={4}
+          lineDashPattern={undefined}
         />
-        <Text style={[styles.statusText, isMoving && { color: Colors.accent }]}>
-          {status === 'DISPATCHED' ? 'Driver assigned' :
-           status === 'ARRIVING'   ? 'Driver on the way' :
-           status === 'PICKED_UP'  ? 'En route to academy' :
-           status === 'AT_ACADEMY' ? 'Arrived at academy' :
-           status === 'COMPLETED'  ? 'Session complete' : 'Scheduled'}
-        </Text>
-      </View>
 
-      {/* Coordinate chips */}
-      <View style={styles.coordRow}>
-        <View style={styles.coordChip}>
-          <Text style={styles.coordLabel}>Driver</Text>
-          <Text style={styles.coordVal}>{driverLat.toFixed(4)}, {driverLng.toFixed(4)}</Text>
-        </View>
-        <View style={styles.coordChip}>
-          <Text style={styles.coordLabel}>You</Text>
-          <Text style={styles.coordVal}>{pickupLat.toFixed(4)}, {pickupLng.toFixed(4)}</Text>
-        </View>
-      </View>
+        {/* ── Driver marker (smooth animated) ──────────────── */}
+        <Marker
+          ref={markerRef}
+          coordinate={{ latitude: driverLat, longitude: driverLng }}
+          anchor={{ x: 0.5, y: 0.5 }}
+          tracksViewChanges={false}
+          onPress={onDriverPress}
+        >
+          <View style={styles.driverMarker}>
+            <Text style={styles.driverMarkerIcon}>🚗</Text>
+          </View>
+        </Marker>
+
+        {/* ── Pickup marker ────────────────────────────────── */}
+        {!isPickedUp && (
+          <Marker
+            coordinate={{ latitude: pickupLat, longitude: pickupLng }}
+            anchor={{ x: 0.5, y: 1 }}
+            tracksViewChanges={false}
+          >
+            <View style={styles.pickupMarker}>
+              <View style={styles.pickupDot} />
+              <View style={styles.pickupStem} />
+            </View>
+          </Marker>
+        )}
+
+        {/* ── Academy marker ───────────────────────────────── */}
+        <Marker
+          coordinate={{ latitude: destLat, longitude: destLng }}
+          anchor={{ x: 0.5, y: 1 }}
+          tracksViewChanges={false}
+        >
+          <View style={styles.academyMarker}>
+            <Text style={styles.academyMarkerIcon}>🏫</Text>
+            <View style={styles.academyMarkerStem} />
+          </View>
+        </Marker>
+      </MapView>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#E8F4F8', overflow: 'hidden', position: 'relative' },
-  grid:            { ...StyleSheet.absoluteFillObject },
-  gridLine:        { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.4)' },
-  gridLineV:       { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(255,255,255,0.4)' },
+  container: { flex: 1 },
+  map:       { flex: 1 },
 
-  routeLine:       { position: 'absolute', top: '45%', left: '12%', right: '12%', height: 3, backgroundColor: Colors.primary, borderRadius: 2, opacity: 0.7 },
+  driverMarker: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: '#0D9488',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 }, elevation: 10,
+    borderWidth: 2.5, borderColor: '#fff',
+  },
+  driverMarkerIcon: { fontSize: 22 },
 
-  markerWrap:      { position: 'absolute', top: '30%', alignItems: 'center' },
-  markerLeft:      { left: '10%' },
-  markerMid:       { left: '45%' },
-  markerRight:     { right: '10%' },
+  pickupMarker: { alignItems: 'center' },
+  pickupDot:    {
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: '#1E3A5F',
+    borderWidth: 3, borderColor: '#fff',
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4, elevation: 8,
+  },
+  pickupStem: { width: 2.5, height: 8, backgroundColor: '#1E3A5F' },
 
-  driverMarker:    { width: 52, height: 52, borderRadius: 26, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...Shadow.md, borderWidth: 2, borderColor: Colors.primary },
-  driverMarkerActive: { borderColor: Colors.accent, shadowColor: Colors.accent },
-  markerPulse:     { position: 'absolute', width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: Colors.primary, opacity: 0.3, top: -6, left: -6 },
-
-  pinMarker:       { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', ...Shadow.sm },
-  markerLabel:     { marginTop: 4, backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  markerLabelText: { fontSize: 10, color: Colors.textPrimary, fontWeight: '600' },
-
-  statusOverlay:   { position: 'absolute', bottom: 80, left: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, ...Shadow.sm },
-  statusText:      { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
-
-  coordRow:        { position: 'absolute', bottom: 16, left: 16, right: 16, flexDirection: 'row', gap: 8 },
-  coordChip:       { flex: 1, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 10, padding: 8 },
-  coordLabel:      { fontSize: 9, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  coordVal:        { fontSize: 10, color: Colors.textSecondary, fontWeight: '600', marginTop: 2 },
+  academyMarker: { alignItems: 'center' },
+  academyMarkerIcon: { fontSize: 26 },
+  academyMarkerStem: { width: 2.5, height: 6, backgroundColor: '#475A6E' },
 })

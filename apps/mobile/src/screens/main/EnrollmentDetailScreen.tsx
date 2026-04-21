@@ -5,6 +5,7 @@ import QRCode from 'react-native-qrcode-svg'
 import { Enrollment } from '@sportnexus/types'
 import { formatCurrency, formatSlotTime } from '@sportnexus/utils'
 import { Colors, FontSize, BorderRadius, Shadow } from '../../constants/theme'
+import { useLocalEnrollmentsStore } from '../../store/localEnrollmentsStore'
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING:   '#F59E0B',
@@ -29,8 +30,18 @@ function Row({ icon, label, value }: { icon: string; label: string; value: strin
 }
 
 export default function EnrollmentDetailScreen({ route, navigation }: any) {
-  const enrollment: Enrollment = route.params?.enrollment
-  if (!enrollment) return null
+  const { enrollments } = useLocalEnrollmentsStore()
+  // Accept either a full enrollment object (from EnrollmentsScreen) or just an ID (from BookingSuccess)
+  const enrollment: Enrollment =
+    route.params?.enrollment ??
+    enrollments.find((e) => e.id === route.params?.enrollmentId)
+
+  if (!enrollment) return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons name="alert-circle-outline" size={40} color={Colors.textMuted} />
+      <Text style={{ marginTop: 12, color: Colors.textSecondary }}>Enrollment not found</Text>
+    </View>
+  )
 
   const academy = (enrollment as any).slot?.program?.academy
   const program = (enrollment as any).slot?.program

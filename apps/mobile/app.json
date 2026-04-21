@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SportsHub",
+    "name": "SportNexus",
     "slug": "sportnexus",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -28,7 +28,12 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBBX9JgBTmpZV3ftmWMGl6hcenP2VW0zzo"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
