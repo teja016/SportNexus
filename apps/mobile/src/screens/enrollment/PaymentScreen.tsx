@@ -186,7 +186,7 @@ export default function PaymentScreen({ navigation }: any) {
         index: 1,
         routes: [
           { name: 'MainTabs' },
-          { name: 'BookingSuccess', params: { enrollmentId: pendingEnrollId } },
+          { name: 'BookingSuccess', params: { enrollmentId: pendingEnrollId, academyName: selectedAcademy?.name } },
         ],
       })
     } catch (err: any) {

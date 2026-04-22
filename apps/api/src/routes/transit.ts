@@ -136,6 +136,74 @@ export default async function transitRoutes(fastify: FastifyInstance) {
     return reply.send({ success: true, data: session })
   })
 
+  // GET /api/transit/driver/today — sessions assigned to the logged-in driver
+  fastify.get('/driver/today', { preHandler: requireAuth }, async (request, reply) => {
+    const { id: driverUserId } = request.user as { id: string }
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    const sessions = await prisma.transitSession.findMany({
+      where: { driverUserId, date: { gte: today, lt: tomorrow } },
+      include: {
+        enrollment: {
+          include: {
+            user:  { select: { id: true, name: true, phone: true } },
+            slot:  { include: { program: { include: { academy: true } } } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return reply.send({ success: true, data: sessions })
+  })
+
+  // PATCH /api/transit/:id/driver-location — driver pushes GPS coordinates
+  fastify.patch('/:id/driver-location', { preHandler: requireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const { lat, lng, etaMinutes } = z.object({
+      lat:        z.number(),
+      lng:        z.number(),
+      etaMinutes: z.number().int().optional(),
+    }).parse(request.body)
+
+    const session = await prisma.transitSession.update({
+      where: { id },
+      data:  { driverLat: lat, driverLng: lng, ...(etaMinutes !== undefined ? { etaMinutes } : {}) },
+    })
+
+    // Broadcast to user's transit room
+    const io = (fastify as any).io
+    if (io) {
+      io.to(`transit:${id}`).emit('location-update', { lat, lng, etaMinutes, status: session.status })
+    }
+
+    return reply.send({ success: true, data: session })
+  })
+
+  // PATCH /api/transit/:id/driver-status — driver updates session status
+  fastify.patch('/:id/driver-status', { preHandler: requireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const body = updateStatusSchema.parse(request.body)
+
+    const session = await prisma.transitSession.update({
+      where: { id },
+      data:  {
+        status: body.status,
+        ...(body.status === 'CANCELLED_BY_USER' ? { cancelledAt: new Date() } : {}),
+      },
+    })
+
+    const io = (fastify as any).io
+    if (io) {
+      io.to(`transit:${id}`).emit('status-update', { status: session.status })
+    }
+
+    return reply.send({ success: true, data: session })
+  })
+
   // POST /api/transit/:id/cancel-today — user cancels their transport for today
   fastify.post('/:id/cancel-today', { preHandler: requireAuth }, async (request, reply) => {
     const { id: userId } = request.user as { id: string }

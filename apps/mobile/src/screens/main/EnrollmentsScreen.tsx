@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useQuery } from '@tanstack/react-query'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
@@ -74,6 +75,14 @@ function EnrollmentCard({ enrollment, navigation }: { enrollment: Enrollment; na
               <Text style={styles.detailText}>{enrollment.durationMonths}mo</Text>
             </View>
           )}
+          {enrollment.startDate && (
+            <View style={styles.detailItem}>
+              <Ionicons name="play-circle-outline" size={13} color={Colors.textMuted} />
+              <Text style={styles.detailText}>
+                {new Date(enrollment.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Footer */}
@@ -116,8 +125,16 @@ export default function EnrollmentsScreen({ navigation }: any) {
 
   const apiEnrollments: Enrollment[] = data ?? []
   const apiIds = new Set(apiEnrollments.map((e) => e.id))
+  // For enrollments in both sources, merge local payment (has prorated transport fee) into API enrollment
+  const merged: Enrollment[] = apiEnrollments.map((apiE) => {
+    const local = localEnrollments.find((l) => l.id === apiE.id)
+    if (local && (local as any).payment) {
+      return { ...apiE, payment: (local as any).payment, startDate: local.startDate ?? (apiE as any).startDate, endDate: local.endDate ?? (apiE as any).endDate } as Enrollment
+    }
+    return apiE
+  })
   const all: Enrollment[] = [
-    ...apiEnrollments,
+    ...merged,
     ...localEnrollments.filter((e) => !apiIds.has(e.id)),
   ]
   const active = all.filter((e) => ['PENDING', 'CONFIRMED', 'ACTIVE'].includes(e.status))
@@ -127,10 +144,10 @@ export default function EnrollmentsScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       {/* ── Header ───────────────────────────────────────── */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#0D9488', '#1E3A5F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <Text style={styles.headerTitle}>My Enrollments</Text>
         <Text style={styles.headerSub}>{all.length} total · {active.length} active</Text>
-      </View>
+      </LinearGradient>
 
       {/* ── Tabs ─────────────────────────────────────────── */}
       <View style={styles.tabs}>
@@ -190,12 +207,12 @@ export default function EnrollmentsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
 
-  header:      { backgroundColor: Colors.surface, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  headerTitle: { fontSize: FontSize['2xl'], fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
-  headerSub:   { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  header:      { paddingTop: 56, paddingBottom: 20, paddingHorizontal: 20 },
+  headerTitle: { fontSize: FontSize['2xl'], fontWeight: FontWeight.extrabold, color: '#fff', letterSpacing: -0.5 },
+  headerSub:   { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 3 },
 
   tabs: { flexDirection: 'row', backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border, paddingHorizontal: 16 },
-  tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 13, paddingHorizontal: 4, marginRight: 24, borderBottomWidth: 2.5, borderBottomColor: 'transparent' },
+  tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 14, paddingHorizontal: 4, marginRight: 24, borderBottomWidth: 2.5, borderBottomColor: 'transparent' },
   tabActive:      { borderBottomColor: Colors.primary },
   tabText:        { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.textMuted },
   tabTextActive:  { color: Colors.primary, fontWeight: FontWeight.bold },
@@ -204,8 +221,8 @@ const styles = StyleSheet.create({
   tabCountText:   { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.bold },
   tabCountTextActive: { color: Colors.primary },
 
-  card:        { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, overflow: 'hidden', ...Shadow.sm },
-  cardAccent:  { width: 4 },
+  card:        { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, overflow: 'hidden', ...Shadow.md },
+  cardAccent:  { width: 5 },
   cardContent: { flex: 1, padding: 14, gap: 10 },
   cardHeader:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   academyName: { fontSize: FontSize.base, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },

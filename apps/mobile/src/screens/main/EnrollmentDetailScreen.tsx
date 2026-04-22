@@ -1,11 +1,14 @@
-import React from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import React, { useState } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import QRCode from 'react-native-qrcode-svg'
 import { Enrollment } from '@sportnexus/types'
 import { formatCurrency, formatSlotTime } from '@sportnexus/utils'
 import { Colors, FontSize, BorderRadius, Shadow } from '../../constants/theme'
 import { useLocalEnrollmentsStore } from '../../store/localEnrollmentsStore'
+import { enrollmentAPI } from '../../services/api'
+import WriteReviewSheet from '../../components/WriteReviewSheet'
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING:   '#F59E0B',
@@ -30,11 +33,20 @@ function Row({ icon, label, value }: { icon: string; label: string; value: strin
 }
 
 export default function EnrollmentDetailScreen({ route, navigation }: any) {
-  const { enrollments } = useLocalEnrollmentsStore()
+  const { enrollments, removeEnrollment } = useLocalEnrollmentsStore()
+  const [showReview, setShowReview] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   // Accept either a full enrollment object (from EnrollmentsScreen) or just an ID (from BookingSuccess)
-  const enrollment: Enrollment =
+  const routeEnrollment: Enrollment =
     route.params?.enrollment ??
     enrollments.find((e) => e.id === route.params?.enrollmentId)
+  // Prefer local store payment (has prorated transport fee)
+  const localMatch = enrollments.find((e) => e.id === routeEnrollment?.id)
+  const enrollment: Enrollment = routeEnrollment
+    ? localMatch && (localMatch as any).payment
+      ? { ...routeEnrollment, payment: (localMatch as any).payment, startDate: localMatch.startDate ?? (routeEnrollment as any).startDate, endDate: localMatch.endDate ?? (routeEnrollment as any).endDate } as Enrollment
+      : routeEnrollment
+    : routeEnrollment
 
   if (!enrollment) return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -55,22 +67,36 @@ export default function EnrollmentDetailScreen({ route, navigation }: any) {
   const enrolledDate = enrollment.enrolledAt
     ? new Date(enrollment.enrolledAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—'
+  const startDateStr = enrollment.startDate
+    ? new Date(enrollment.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '—'
+  const endDateStr = enrollment.endDate
+    ? new Date(enrollment.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : enrollment.startDate
+    ? (() => {
+        const end = new Date(enrollment.startDate!)
+        end.setMonth(end.getMonth() + enrollment.durationMonths)
+        return end.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+      })()
+    : '—'
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.academyIconWrap}>
-          <Text style={{ fontSize: 32 }}>🏟️</Text>
+      <LinearGradient colors={['#0D9488', '#1E3A5F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <View style={styles.headerRow}>
+          <View style={styles.academyIconWrap}>
+            <Text style={{ fontSize: 28 }}>🏟️</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.academyName}>{academy?.name ?? 'Academy'}</Text>
+            <Text style={styles.programName}>{program?.name ?? '—'}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+            <Text style={[styles.statusText, { color: '#fff' }]}>{enrollment.status}</Text>
+          </View>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.academyName}>{academy?.name ?? 'Academy'}</Text>
-          <Text style={styles.programName}>{program?.name ?? '—'}</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-          <Text style={[styles.statusText, { color: statusColor }]}>{enrollment.status}</Text>
-        </View>
-      </View>
+      </LinearGradient>
 
       {/* Booking Reference */}
       <View style={styles.bookingCard}>
@@ -96,6 +122,18 @@ export default function EnrollmentDetailScreen({ route, navigation }: any) {
           <Row icon="calendar-outline" label="Days"       value={days} />
           <View style={styles.divider} />
           <Row icon="hourglass-outline" label="Duration"  value={`${enrollment.durationMonths} month${enrollment.durationMonths > 1 ? 's' : ''}`} />
+          {startDateStr !== '—' && (
+            <>
+              <View style={styles.divider} />
+              <Row icon="play-circle-outline" label="Start Date" value={startDateStr} />
+            </>
+          )}
+          {endDateStr !== '—' && (
+            <>
+              <View style={styles.divider} />
+              <Row icon="stop-circle-outline" label="End Date"   value={endDateStr} />
+            </>
+          )}
         </View>
       </View>
 
@@ -169,16 +207,92 @@ export default function EnrollmentDetailScreen({ route, navigation }: any) {
           <Text style={styles.trackBtnText}>Track Live Transport</Text>
         </TouchableOpacity>
       )}
+
+      {(['ACTIVE', 'COMPLETED', 'CONFIRMED'] as string[]).includes(enrollment.status) && (
+        <TouchableOpacity
+          style={styles.reviewBtn}
+          onPress={() => setShowReview(true)}
+        >
+          <Ionicons name="star-outline" size={18} color={Colors.primary} />
+          <Text style={styles.reviewBtnText}>Rate this Academy</Text>
+        </TouchableOpacity>
+      )}
+
+      {payment && (
+        <TouchableOpacity
+          style={styles.receiptBtn}
+          onPress={() => Share.share({
+            message: [
+              `SportNexus Payment Receipt`,
+              `Academy: ${academy?.name ?? '—'}`,
+              `Program: ${program?.name ?? '—'}`,
+              `Booking Ref: #${bookingRef}`,
+              `Training Fee: ${formatCurrency(payment.amount)}`,
+              ...(payment.transportFee > 0 ? [`Transport Fee: ${formatCurrency(payment.transportFee)}`] : []),
+              `Total Paid: ${formatCurrency(payment.totalAmount)}`,
+              `Status: ${payment.status}`,
+              `Date: ${enrolledDate}`,
+            ].join('\n'),
+          })}
+        >
+          <Ionicons name="receipt-outline" size={18} color={Colors.textSecondary} />
+          <Text style={styles.receiptBtnText}>Share Receipt</Text>
+        </TouchableOpacity>
+      )}
+
+      {(['PENDING', 'CONFIRMED'] as string[]).includes(enrollment.status) && (
+        <TouchableOpacity
+          style={styles.cancelBtn}
+          onPress={() => {
+            Alert.alert(
+              'Cancel Enrollment',
+              'Are you sure you want to cancel this enrollment? This cannot be undone.',
+              [
+                { text: 'Keep Enrollment', style: 'cancel' },
+                {
+                  text: 'Cancel Enrollment',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      setCancelling(true)
+                      await enrollmentAPI.cancel(enrollment.id)
+                      removeEnrollment?.(enrollment.id)
+                      navigation.goBack()
+                    } catch {
+                      Alert.alert('Error', 'Could not cancel enrollment. Please try again.')
+                    } finally {
+                      setCancelling(false)
+                    }
+                  },
+                },
+              ]
+            )
+          }}
+          disabled={cancelling}
+        >
+          <Ionicons name="close-circle-outline" size={18} color={Colors.danger} />
+          <Text style={styles.cancelBtnText}>{cancelling ? 'Cancelling...' : 'Cancel Enrollment'}</Text>
+        </TouchableOpacity>
+      )}
+
+      {showReview && (
+        <WriteReviewSheet
+          academyId={(enrollment as any).slot?.program?.academy?.id ?? ''}
+          academyName={(enrollment as any).slot?.program?.academy?.name ?? 'Academy'}
+          onClose={() => setShowReview(false)}
+        />
+      )}
     </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   container:       { flex: 1, backgroundColor: Colors.background },
-  header:          { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.surface, padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  academyIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.tealLight, alignItems: 'center', justifyContent: 'center' },
-  academyName:     { fontSize: FontSize.base, fontWeight: '800', color: Colors.textPrimary },
-  programName:     { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600', marginTop: 2 },
+  header:          { paddingTop: 16, paddingBottom: 20, paddingHorizontal: 16 },
+  headerRow:       { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  academyIconWrap: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  academyName:     { fontSize: FontSize.base, fontWeight: '800', color: '#fff' },
+  programName:     { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.7)', fontWeight: '600', marginTop: 2 },
   statusBadge:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: BorderRadius.full },
   statusText:      { fontSize: FontSize.xs, fontWeight: '800' },
   bookingCard:     { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: Colors.navy, margin: 16, borderRadius: BorderRadius.lg, padding: 16, ...Shadow.sm },
@@ -195,4 +309,10 @@ const styles = StyleSheet.create({
   divider:         { height: 1, backgroundColor: Colors.border, marginVertical: 6 },
   trackBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: Colors.primary, margin: 16, marginTop: 20, borderRadius: BorderRadius.md, paddingVertical: 16 },
   trackBtnText:    { color: '#fff', fontSize: FontSize.base, fontWeight: '800' },
+  receiptBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, margin: 16, marginTop: 8, borderRadius: BorderRadius.md, paddingVertical: 13 },
+  receiptBtnText:  { color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '700' },
+  cancelBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: Colors.danger, backgroundColor: '#FEF2F2', margin: 16, marginTop: 8, borderRadius: BorderRadius.md, paddingVertical: 13 },
+  cancelBtnText:   { color: Colors.danger, fontSize: FontSize.sm, fontWeight: '700' },
+  reviewBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1.5, borderColor: Colors.primary, backgroundColor: Colors.tealXLight, margin: 16, marginTop: 8, borderRadius: BorderRadius.md, paddingVertical: 14 },
+  reviewBtnText:   { color: Colors.primary, fontSize: FontSize.base, fontWeight: '700' },
 })

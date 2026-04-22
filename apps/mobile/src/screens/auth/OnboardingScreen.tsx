@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { View, Text, FlatList, TouchableOpacity, Animated, StyleSheet, Dimensions } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuthStore } from '../../store/authStore'
 import { Colors, FontSize, FontWeight, BorderRadius } from '../../constants/theme'
@@ -9,32 +10,35 @@ const { width } = Dimensions.get('window')
 const SLIDES = [
   {
     id: '1',
-    icon: 'trophy-outline' as const,
-    iconBg: Colors.primary,
+    emoji: '🏆',
+    emojiArt: ['🏏', '⚽', '🎾', '🏊', '🏀', '🥊'],
     title: 'Find Your\nPerfect Academy',
     subtitle: 'Discover top-rated sports academies near you with verified coaches and world-class facilities.',
     bg: Colors.navy,
     accent: Colors.primary,
+    glow: '#0D9488',
     bubbles: ['#0D9488', '#14B8A6', '#0A7A6B'],
   },
   {
     id: '2',
-    icon: 'calendar-outline' as const,
-    iconBg: '#6366F1',
+    emoji: '⚡',
+    emojiArt: ['📅', '💳', '✅', '🎯', '🔥', '💪'],
     title: 'Enroll in\nSeconds',
     subtitle: 'Book your preferred training slots, choose duration, and confirm payment — all in one flow.',
     bg: '#1E1B4B',
     accent: '#6366F1',
+    glow: '#6366F1',
     bubbles: ['#6366F1', '#818CF8', '#4F46E5'],
   },
   {
     id: '3',
-    icon: 'navigate-outline' as const,
-    iconBg: '#0EA5E9',
+    emoji: '📍',
+    emojiArt: ['🚌', '📡', '🛣️', '🗺️', '⏱️', '🔔'],
     title: 'Track Your\nCommute Live',
     subtitle: 'Real-time GPS tracking for your pickup vehicle so you\'re never late for training.',
     bg: '#0C1A2E',
     accent: '#0EA5E9',
+    glow: '#0EA5E9',
     bubbles: ['#0EA5E9', '#38BDF8', '#0284C7'],
   },
 ]
@@ -87,10 +91,29 @@ export default function OnboardingScreen({ navigation }: any) {
             <View style={[styles.bubble, styles.bubble2, { backgroundColor: item.bubbles[1] + '20' }]} />
             <View style={[styles.bubble, styles.bubble3, { backgroundColor: item.bubbles[2] + '15' }]} />
 
-            {/* Icon */}
-            <View style={[styles.iconWrap, { backgroundColor: item.iconBg }]}>
-              <View style={[styles.iconRing, { borderColor: item.iconBg + '40' }]} />
-              <Ionicons name={item.icon} size={52} color="#fff" />
+            {/* Floating emoji decorations */}
+            {item.emojiArt.map((e: string, i: number) => {
+              const positions = [
+                { top: 80,  left: 24 },  { top: 110, right: 30 },
+                { top: 200, left: 14 },  { top: 240, right: 20 },
+                { top: 320, left: 40 },  { top: 300, right: 10 },
+              ]
+              const pos = positions[i] ?? { top: 100, left: 20 }
+              return (
+                <Text key={i} style={{ position: 'absolute', fontSize: 28, opacity: 0.2, ...pos } as any}>{e}</Text>
+              )
+            })}
+
+            {/* Hero emoji with glow */}
+            <View style={styles.iconArea}>
+              <View style={[styles.glowRing, { borderColor: item.glow + '35' }]} />
+              <View style={[styles.glowRing, styles.glowRing2, { borderColor: item.glow + '20' }]} />
+              <LinearGradient
+                colors={[item.glow, item.glow + 'AA']}
+                style={[styles.iconWrap, { shadowColor: item.glow }]}
+              >
+                <Text style={{ fontSize: 56 }}>{item.emoji}</Text>
+              </LinearGradient>
             </View>
 
             {/* Text */}
@@ -158,15 +181,14 @@ const styles = StyleSheet.create({
   bubble2: { width: 180, height: 180, bottom: 80, left: -50 },
   bubble3: { width: 120, height: 120, top: '40%', right: -20 },
 
+  iconArea:   { alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  glowRing:   { position: 'absolute', width: 168, height: 168, borderRadius: 56, borderWidth: 1.5 },
+  glowRing2:  { width: 200, height: 200, borderRadius: 68 },
   iconWrap: {
-    width: 120, height: 120, borderRadius: 40,
+    width: 128, height: 128, borderRadius: 44,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4, shadowRadius: 30, elevation: 20,
-  },
-  iconRing: {
-    position: 'absolute', width: 148, height: 148, borderRadius: 48,
-    borderWidth: 2,
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.55, shadowRadius: 36, elevation: 24,
   },
 
   title: {

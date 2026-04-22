@@ -22,6 +22,8 @@
     "axios": "^1.7.7",
     "expo": "~52.0.0",
     "expo-font": "~13.0.4",
+    "expo-image-picker": "^15.1.0",
+    "expo-linear-gradient": "^14.0.2",
     "expo-linking": "~7.0.3",
     "expo-location": "~18.0.3",
     "expo-notifications": "~0.29.9",
@@ -36,6 +38,7 @@
     "react-native-screens": "~4.1.0",
     "react-native-svg": "15.8.0",
     "react-native-web": "~0.19.13",
+    "react-native-webview": "^13.12.5",
     "socket.io-client": "^4.7.5",
     "zustand": "^4.5.5"
   },

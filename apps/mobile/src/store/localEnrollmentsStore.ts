@@ -7,6 +7,7 @@ import { Enrollment } from '@sportnexus/types'
 interface LocalEnrollmentsState {
   enrollments: Enrollment[]
   addEnrollment: (e: Enrollment) => void
+  removeEnrollment: (id: string) => void
   clear: () => void
 }
 
@@ -15,6 +16,7 @@ export const useLocalEnrollmentsStore = create<LocalEnrollmentsState>()(
     (set, get) => ({
       enrollments: [],
       addEnrollment: (e) => set({ enrollments: [e, ...get().enrollments] }),
+      removeEnrollment: (id) => set({ enrollments: get().enrollments.filter((e) => e.id !== id) }),
       clear: () => set({ enrollments: [] }),
     }),
     {

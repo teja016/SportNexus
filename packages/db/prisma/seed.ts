@@ -335,11 +335,28 @@ async function main() {
 
   console.log('✅ Created 31 slots')
 
+  // ─── Drivers ─────────────────────────────────────────────────────────────
+  await Promise.all([
+    prisma.user.upsert({
+      where: { email: 'driver1@sportshub.com' },
+      update: {},
+      create: { name: 'Ramesh Kumar', email: 'driver1@sportshub.com', phone: '+917777777771', role: 'DRIVER' },
+    }),
+    prisma.user.upsert({
+      where: { email: 'driver2@sportshub.com' },
+      update: {},
+      create: { name: 'Suresh Reddy', email: 'driver2@sportshub.com', phone: '+917777777772', role: 'DRIVER' },
+    }),
+  ])
+
+  console.log('✅ Created 2 drivers')
+
   console.log('\n🎉 Database seeded successfully!')
   console.log('\n📋 Test credentials:')
-  console.log('   User:  user@sportshub.com / +919999999999')
-  console.log('   Admin: admin1@sportshub.com / +918888888881')
-  console.log('   OTP:   any 6 digits (dev mode)')
+  console.log('   User:   user@sportshub.com / +919999999999')
+  console.log('   Admin:  admin1@sportshub.com / +918888888881')
+  console.log('   Driver: driver1@sportshub.com / +917777777771')
+  console.log('   OTP:    any 6 digits (dev mode)')
 }
 
 main()

@@ -21,6 +21,13 @@ const RATING_OPTIONS = [
   { label: '4+',  value: 4 },
   { label: '4.5+', value: 4.5 },
 ]
+const DISTANCE_OPTIONS = [
+  { label: 'Any',   value: 0  },
+  { label: '5 km',  value: 5  },
+  { label: '10 km', value: 10 },
+  { label: '25 km', value: 25 },
+  { label: '50 km', value: 50 },
+]
 const SORT_OPTIONS = [
   { key: 'distance', label: 'Nearest',    icon: 'location-outline' },
   { key: 'rating',   label: 'Top Rated',  icon: 'star-outline' },
@@ -102,6 +109,7 @@ export default function SearchScreen({ navigation }: any) {
   const [selectedSports, setSelectedSports] = useState<string[]>([])
   const [minRating,      setMinRating]      = useState(0)
   const [transportOnly,  setTransportOnly]  = useState(false)
+  const [radiusKm,       setRadiusKm]       = useState(25)
   const [sortBy,         setSortBy]         = useState<'distance' | 'rating' | 'price'>('distance')
   const [recentSearches, setRecentSearches] = useState<string[]>([])
 
@@ -113,16 +121,18 @@ export default function SearchScreen({ navigation }: any) {
     return () => clearTimeout(t)
   }, [searchText])
 
-  const activeFilters = selectedSports.length + (minRating > 0 ? 1 : 0) + (transportOnly ? 1 : 0)
+  const activeFilters = selectedSports.length + (minRating > 0 ? 1 : 0) + (transportOnly ? 1 : 0) + (radiusKm !== 25 ? 1 : 0)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['search', userLat, userLng, debouncedText, selectedSports, minRating, transportOnly],
+    queryKey: ['search', userLat, userLng, debouncedText, selectedSports, minRating, transportOnly, radiusKm],
     queryFn:  () => academyAPI.list({
-      lat: userLat ?? undefined, lng: userLng ?? undefined,
-      search: debouncedText || undefined,
-      sport:  selectedSports.length === 1 ? selectedSports[0] : undefined,
-      rating: minRating > 0 ? minRating : undefined,
+      lat:       userLat ?? undefined,
+      lng:       userLng ?? undefined,
+      search:    debouncedText || undefined,
+      sport:     selectedSports.length === 1 ? selectedSports[0] : undefined,
+      rating:    minRating > 0 ? minRating : undefined,
       transport: transportOnly || undefined,
+      radius:    radiusKm > 0 ? radiusKm : 100,
     }),
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
@@ -130,7 +140,24 @@ export default function SearchScreen({ navigation }: any) {
   })
 
   const academies: Academy[] = useMemo(() => {
-    let list: Academy[] = data?.data ?? MOCK_ACADEMIES
+    let list: Academy[]
+    if (data?.data) {
+      list = data.data
+    } else {
+      // API offline — filter mock data client-side so search still works
+      const text = debouncedText.toLowerCase()
+      list = MOCK_ACADEMIES.filter((a) => {
+        const matchesText = !text ||
+          a.name.toLowerCase().includes(text) ||
+          (a.city ?? '').toLowerCase().includes(text) ||
+          a.programs?.some((p: any) => p.sportType.toLowerCase().includes(text))
+        const matchesSport = selectedSports.length === 0 ||
+          selectedSports.some((s) => a.programs?.some((p: any) => p.sportType === s))
+        const matchesRating = minRating === 0 || a.rating >= minRating
+        const matchesTransport = !transportOnly || a.transportAvailable
+        return !!(matchesText && matchesSport && matchesRating && matchesTransport)
+      })
+    }
     if (sortBy === 'rating') return [...list].sort((a, b) => b.rating - a.rating)
     if (sortBy === 'price') return [...list].sort((a, b) => {
       const aMin = Math.min(...(a.programs ?? [{ feeMonthly: 0 }]).map((p: any) => p.feeMonthly))
@@ -138,7 +165,7 @@ export default function SearchScreen({ navigation }: any) {
       return aMin - bMin
     })
     return list
-  }, [data, sortBy])
+  }, [data, sortBy, debouncedText, selectedSports, minRating, transportOnly])
 
   function saveRecentSearch(text: string) {
     if (!text.trim()) return
@@ -286,7 +313,7 @@ export default function SearchScreen({ navigation }: any) {
           {activeFilters > 0 && (
             <TouchableOpacity
               style={styles.clearFiltersBtn}
-              onPress={() => { setSelectedSports([]); setMinRating(0); setTransportOnly(false) }}
+              onPress={() => { setSelectedSports([]); setMinRating(0); setTransportOnly(false); setRadiusKm(25) }}
             >
               <Text style={styles.clearFiltersText}>Clear all filters</Text>
             </TouchableOpacity>
@@ -313,13 +340,27 @@ export default function SearchScreen({ navigation }: any) {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Filters</Text>
             {activeFilters > 0 && (
-              <TouchableOpacity onPress={() => { setSelectedSports([]); setMinRating(0); setTransportOnly(false) }}>
+              <TouchableOpacity onPress={() => { setSelectedSports([]); setMinRating(0); setTransportOnly(false); setRadiusKm(25) }}>
                 <Text style={styles.clearText}>Clear all</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.closeBtn} onPress={() => setShowFilters(false)}>
               <Ionicons name="close" size={20} color={Colors.textPrimary} />
             </TouchableOpacity>
+          </View>
+
+          <Text style={styles.filterLabel}>Distance Radius</Text>
+          <View style={styles.ratingRow}>
+            {DISTANCE_OPTIONS.map((d) => (
+              <TouchableOpacity
+                key={d.value}
+                style={[styles.ratingChip, radiusKm === d.value && styles.ratingChipActive]}
+                onPress={() => setRadiusKm(d.value)}
+              >
+                {d.value > 0 && <Ionicons name="locate-outline" size={11} color={radiusKm === d.value ? '#fff' : Colors.primary} />}
+                <Text style={[styles.ratingChipText, radiusKm === d.value && { color: '#fff' }]}>{d.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
           <Text style={styles.filterLabel}>Sport Type</Text>

@@ -9,6 +9,7 @@ import { initSocket } from './socket'
 import { AppError } from './errors'
 import { startNotificationWorker } from './workers/notificationWorker'
 import { startDailyTransitWorker } from './workers/dailyTransitWorker'
+import { startEnrollmentExpiryWorker } from './workers/enrollmentExpiryWorker'
 
 import authRoutes from './routes/auth'
 import userRoutes from './routes/users'
@@ -112,6 +113,7 @@ async function bootstrap() {
       console.warn(`[Workers] Redis ${redisMajor}.x detected — BullMQ requires Redis 5+. Workers disabled. Run Docker Redis for full functionality.`)
     } else {
       startNotificationWorker()
+      startEnrollmentExpiryWorker()
       await startDailyTransitWorker()
     }
   } catch (err) {

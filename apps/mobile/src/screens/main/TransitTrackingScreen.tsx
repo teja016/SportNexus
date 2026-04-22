@@ -35,11 +35,13 @@ function msUntilTime(timeStart: string): number {
 }
 
 function formatCountdown(ms: number): string {
-  if (ms <= 0) return '0m'
+  if (ms <= 0) return 'now'
   const totalMin = Math.floor(ms / 60000)
   const h = Math.floor(totalMin / 60)
   const m = totalMin % 60
-  return h > 0 ? `${h}h ${m}m` : `${m}m`
+  if (h > 0) return `${h}h ${m}m`
+  if (totalMin === 0) return 'less than 1 min'
+  return `${m}m`
 }
 
 // ── Derive screen state from data ─────────────────────────────────────────────
@@ -85,6 +87,7 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
   const queryClient = useQueryClient()
   const [showDriver, setShowDriver] = useState(false)
   const [countdown, setCountdown] = useState('')
+  const [, forceUpdate] = useState(0)
 
   const enrollmentFromStore = enrollments.find(
     (e) => e.id === (enrollmentId ?? paramSessionId)
@@ -131,14 +134,20 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
 
   const trackState = deriveState(session, enrollmentFromStore, timeStart)
 
-  // Countdown ticker
+  // Countdown ticker — runs every 30s normally, every 5s in last 3 minutes, forces re-render when it hits 0
   useEffect(() => {
-    if (trackState !== 'too-early' || !timeStart) return
-    const tick = () => setCountdown(formatCountdown(msUntilTime(timeStart) - 45 * 60000))
+    if (!timeStart) return
+    const tick = () => {
+      const msLeft = msUntilTime(timeStart) - 45 * 60000
+      setCountdown(formatCountdown(msLeft))
+      if (msLeft <= 0) forceUpdate((n) => n + 1)   // trigger state re-derive when window opens
+    }
     tick()
-    const id = setInterval(tick, 30_000)
+    const msLeft = msUntilTime(timeStart) - 45 * 60000
+    const interval = msLeft > 3 * 60000 ? 30_000 : 5_000
+    const id = setInterval(tick, interval)
     return () => clearInterval(id)
-  }, [trackState, timeStart])
+  }, [timeStart])
 
   // Auto-init today's session when no session found
   useEffect(() => {
@@ -346,6 +355,19 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
   }
 
   // ── State: pre-pickup & live tracking ────────────────────────────────────
+  // Guard: if session still loading after state transition, show spinner
+  if (!session && sessionLoading) {
+    return (
+      <View style={styles.stateContainer}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Loading tracking info...</Text>
+      </View>
+    )
+  }
+
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>

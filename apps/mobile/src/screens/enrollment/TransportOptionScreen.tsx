@@ -113,7 +113,7 @@ export default function TransportOptionScreen({ navigation }: any) {
   function handleContinue() {
     if (opted && (!address.trim() || distance <= 0)) return
     setTransport(opted, address.trim(), 0, 0, distance)
-    if (opted && selectedDate) setStartDate(selectedDate)
+    setStartDate(selectedDate)
     navigation.navigate('Payment')
   }
 
@@ -147,6 +147,57 @@ export default function TransportOptionScreen({ navigation }: any) {
           </View>
           <Text style={styles.optionPrice}>₹25/km</Text>
         </TouchableOpacity>
+
+        {/* ── Start Date Picker (shown for all users) ────── */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.detailsTitle}>When do you want to start?</Text>
+          <Text style={styles.sectionSubtitle}>
+            Choose the date you'd like your training to begin.
+          </Text>
+
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={DATE_CHIPS}
+            keyExtractor={(d) => d.toISOString()}
+            contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+            renderItem={({ item: d }) => {
+              const isSelected =
+                d.getDate() === selectedDate.getDate() &&
+                d.getMonth() === selectedDate.getMonth()
+              return (
+                <TouchableOpacity
+                  style={[styles.dateChip, isSelected && styles.dateChipActive]}
+                  onPress={() => setSelectedDate(d)}
+                >
+                  <Text style={[styles.dateChipDay, isSelected && styles.dateChipTextActive]}>
+                    {DAY_NAMES[d.getDay()]}
+                  </Text>
+                  <Text style={[styles.dateChipNum, isSelected && styles.dateChipTextActive]}>
+                    {d.getDate()}
+                  </Text>
+                  <Text style={[styles.dateChipMonth, isSelected && styles.dateChipTextActive]}>
+                    {MONTH_SHORT[d.getMonth()]}
+                  </Text>
+                </TouchableOpacity>
+              )
+            }}
+          />
+
+          {/* Show end date for all users */}
+          <View style={styles.endDateRow}>
+            <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
+            <Text style={styles.endDateText}>
+              Ends on{' '}
+              <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
+                {(() => {
+                  const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + durationMonths, 0)
+                  return end.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+                })()}
+              </Text>
+            </Text>
+          </View>
+        </View>
 
         {opted && (
           <>
@@ -185,45 +236,7 @@ export default function TransportOptionScreen({ navigation }: any) {
               )}
             </View>
 
-            {/* ── Start Date Picker ──────────────────────────── */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.detailsTitle}>When do you want to start?</Text>
-              <Text style={styles.sectionSubtitle}>
-                Transport fee for the first month is calculated based on days remaining.
-              </Text>
-
-              <FlatList
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                data={DATE_CHIPS}
-                keyExtractor={(d) => d.toISOString()}
-                contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
-                renderItem={({ item: d }) => {
-                  const isSelected =
-                    d.getDate() === selectedDate.getDate() &&
-                    d.getMonth() === selectedDate.getMonth()
-                  const isToday = false // chips start from tomorrow
-                  return (
-                    <TouchableOpacity
-                      style={[styles.dateChip, isSelected && styles.dateChipActive]}
-                      onPress={() => setSelectedDate(d)}
-                    >
-                      <Text style={[styles.dateChipDay, isSelected && styles.dateChipTextActive]}>
-                        {DAY_NAMES[d.getDay()]}
-                      </Text>
-                      <Text style={[styles.dateChipNum, isSelected && styles.dateChipTextActive]}>
-                        {d.getDate()}
-                      </Text>
-                      <Text style={[styles.dateChipMonth, isSelected && styles.dateChipTextActive]}>
-                        {MONTH_SHORT[d.getMonth()]}
-                      </Text>
-                    </TouchableOpacity>
-                  )
-                }}
-              />
-            </View>
-
-            {/* ── Fee Breakdown ──────────────────────────────── */}
+            {/* ── Transport Fee Breakdown ────────────────────── */}
             {breakdown && (
               <View style={styles.breakdownCard}>
                 <View style={styles.breakdownHeader}>
@@ -251,16 +264,6 @@ export default function TransportOptionScreen({ navigation }: any) {
                     Total ({durationMonths} month{durationMonths > 1 ? 's' : ''})
                   </Text>
                   <Text style={styles.breakdownTotalAmount}>{formatCurrency(breakdown.total)}</Text>
-                </View>
-
-                <View style={styles.endDateRow}>
-                  <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
-                  <Text style={styles.endDateText}>
-                    Ends on{' '}
-                    <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
-                      {breakdown.endDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </Text>
-                  </Text>
                 </View>
               </View>
             )}

@@ -1,6 +1,6 @@
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export type UserRole = 'USER' | 'ACADEMY_ADMIN' | 'SUPER_ADMIN' | 'TRANSPORT_OPERATOR'
+export type UserRole = 'USER' | 'ACADEMY_ADMIN' | 'SUPER_ADMIN' | 'TRANSPORT_OPERATOR' | 'DRIVER'
 export type EnrollmentStatus = 'PENDING' | 'CONFIRMED' | 'ACTIVE' | 'CANCELLED' | 'EXPIRED'
 export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED'
 export type TransitStatus = 'SCHEDULED' | 'DISPATCHED' | 'ARRIVING' | 'PICKED_UP' | 'AT_ACADEMY' | 'COMPLETED'
@@ -46,6 +46,7 @@ export interface Academy {
   coaches?: Coach[]
   programs?: SportProgram[]
   transportRoutes?: TransportRoute[]
+  reviews?: Review[]
   // Computed
   distance?: number
 }
@@ -110,6 +111,8 @@ export interface Enrollment {
   pickupAddress?: string | null
   pickupDistance?: number | null
   durationMonths: number
+  startDate?: string | null
+  endDate?: string | null
   status: EnrollmentStatus
   enrolledAt: string
   expiresAt?: string | null
@@ -165,6 +168,17 @@ export interface TransitSession {
   updatedAt: string
   // Relations
   enrollment?: Enrollment
+}
+
+export interface Review {
+  id: string
+  userId: string
+  academyId: string
+  rating: number
+  comment?: string | null
+  createdAt: string
+  updatedAt: string
+  user?: Pick<User, 'id' | 'name'>
 }
 
 // ─── API Response Envelopes ───────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { prisma } from '@sportnexus/db'
 import { calculateDistance } from '@sportnexus/utils'
 import { getCache, setCache, deleteCache } from '../redis'
 import { NotFoundError } from '../errors'
+import { requireAuth } from '../plugins/auth'
 import crypto from 'crypto'
 
 const listQuerySchema = z.object({
@@ -120,6 +121,56 @@ export default async function academyRoutes(fastify: FastifyInstance) {
     })
 
     return reply.send({ success: true, data: programs })
+  })
+
+  // GET /api/academies/:id/reviews
+  fastify.get('/:id/reviews', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const reviews = await prisma.review.findMany({
+      where: { academyId: id },
+      include: { user: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    })
+    return reply.send({ success: true, data: reviews })
+  })
+
+  // POST /api/academies/:id/reviews
+  fastify.post('/:id/reviews', { preHandler: requireAuth }, async (request, reply) => {
+    const { id: academyId } = request.params as { id: string }
+    const { id: userId } = request.user as { id: string }
+    const { rating, comment } = z.object({
+      rating:  z.number().int().min(1).max(5),
+      comment: z.string().max(500).optional(),
+    }).parse(request.body)
+
+    const academy = await prisma.academy.findUnique({ where: { id: academyId } })
+    if (!academy) throw new NotFoundError('Academy')
+
+    const review = await prisma.review.upsert({
+      where: { userId_academyId: { userId, academyId } },
+      update: { rating, comment },
+      create: { userId, academyId, rating, comment },
+      include: { user: { select: { id: true, name: true } } },
+    })
+
+    // Recalculate academy rating dynamically
+    const agg = await prisma.review.aggregate({
+      where: { academyId },
+      _avg: { rating: true },
+      _count: { id: true },
+    })
+    await prisma.academy.update({
+      where: { id: academyId },
+      data: {
+        rating:      Math.round((agg._avg.rating ?? 0) * 10) / 10,
+        reviewCount: agg._count.id,
+      },
+    })
+    await deleteCache(`academy:${academyId}`)
+    await deleteCache('academies:*')
+
+    return reply.code(201).send({ success: true, data: review })
   })
 
   // POST /api/academies (Admin: create)

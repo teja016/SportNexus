@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { Colors, FontSize, BorderRadius, Shadow } from '../constants/theme'
+import { Colors, FontSize, FontWeight, BorderRadius, Shadow } from '../constants/theme'
+import WriteReviewSheet from './WriteReviewSheet'
 
 interface Review {
   id: string
@@ -14,6 +15,7 @@ interface Review {
 interface Props {
   reviews: Review[]
   academyName: string
+  academyId?: string
   overallRating: number
   onClose: () => void
 }
@@ -33,7 +35,8 @@ function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
   )
 }
 
-export default function ReviewsModal({ reviews, academyName, overallRating, onClose }: Props) {
+export default function ReviewsModal({ reviews, academyName, academyId, overallRating, onClose }: Props) {
+  const [showWrite, setShowWrite] = useState(false)
   const initials = (name: string) => name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
 
   return (
@@ -53,11 +56,23 @@ export default function ReviewsModal({ reviews, academyName, overallRating, onCl
         {/* Rating Summary */}
         <View style={styles.ratingSummary}>
           <Text style={styles.ratingBig}>{overallRating.toFixed(1)}</Text>
-          <View>
+          <View style={{ flex: 1 }}>
             <StarRating rating={overallRating} size={20} />
             <Text style={styles.reviewCount}>{reviews.length} reviews</Text>
           </View>
+          <TouchableOpacity style={styles.writeBtn} onPress={() => setShowWrite(true)}>
+            <Ionicons name="pencil-outline" size={14} color={Colors.primary} />
+            <Text style={styles.writeBtnText}>Write Review</Text>
+          </TouchableOpacity>
         </View>
+
+        {showWrite && (
+          <WriteReviewSheet
+            academyId={academyId ?? ''}
+            academyName={academyName}
+            onClose={() => setShowWrite(false)}
+          />
+        )}
 
         <FlatList
           data={reviews}
@@ -99,9 +114,11 @@ const styles = StyleSheet.create({
   title:          { fontSize: FontSize.xl, fontWeight: '800', color: Colors.textPrimary },
   subtitle:       { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
   closeBtn:       { padding: 8, backgroundColor: Colors.surface, borderRadius: 20, ...Shadow.sm },
-  ratingSummary:  { flexDirection: 'row', alignItems: 'center', gap: 20, paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  ratingSummary:  { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
   ratingBig:      { fontSize: 48, fontWeight: '800', color: Colors.textPrimary },
   reviewCount:    { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 4 },
+  writeBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.tealXLight, paddingHorizontal: 12, paddingVertical: 8, borderRadius: BorderRadius.full, borderWidth: 1, borderColor: Colors.tealLight },
+  writeBtnText:   { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.primary },
   reviewCard:     { backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: 14, ...Shadow.sm, gap: 10 },
   reviewHeader:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar:         { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },

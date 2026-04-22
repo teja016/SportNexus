@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, Modal, StyleSheet, Platform } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, Modal, StyleSheet, Platform, Image } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useQuery } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { userAPI } from '../../services/api'
@@ -41,10 +42,28 @@ export default function ProfileScreen({ navigation }: any) {
     retry: 1,
   })
 
+  const { data: enrollmentsData } = useQuery({
+    queryKey: ['my-enrollments'],
+    queryFn:  () => {
+      const { enrollmentAPI } = require('../../services/api')
+      return enrollmentAPI.getMyEnrollments()
+    },
+    staleTime: 60 * 1000,
+    retry: 1,
+  })
+
   const profile  = data ?? user
   const initials = profile?.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() ?? '?'
-  const active   = localEnrollments.filter((e) => ['PENDING', 'CONFIRMED', 'ACTIVE'].includes(e.status)).length
-  const academies= new Set(localEnrollments.map((e) => (e as any).slot?.program?.academyId).filter(Boolean)).size
+
+  // Use API data when available, fall back to local store
+  const allEnrollments: any[] = enrollmentsData ?? localEnrollments
+  const total    = allEnrollments.length || localEnrollments.length
+  const active   = allEnrollments.filter((e: any) => ['PENDING', 'CONFIRMED', 'ACTIVE'].includes(e.status)).length || localEnrollments.filter((e) => ['PENDING', 'CONFIRMED', 'ACTIVE'].includes(e.status)).length
+  const academyIds = new Set([
+    ...allEnrollments.map((e: any) => e.slot?.program?.academy?.id ?? e.slot?.program?.academyId).filter(Boolean),
+    ...localEnrollments.map((e) => (e as any).slot?.program?.academyId).filter(Boolean),
+  ])
+  const academies = academyIds.size
 
   function confirmLogout() {
     if (Platform.OS !== 'web') {
@@ -62,12 +81,19 @@ export default function ProfileScreen({ navigation }: any) {
     <>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
         {/* ── Hero Header ──────────────────────────────────── */}
-        <View style={styles.hero}>
-          <View style={styles.heroBg} />
+        <LinearGradient colors={['#0D9488', '#1E3A5F', '#0F172A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+          {/* removed heroBg - gradient replaces it */}
 
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initials}</Text>
+          <TouchableOpacity style={styles.avatarWrap} onPress={() => navigation.navigate('EditProfile')} activeOpacity={0.85}>
+            {profile?.profilePhoto ? (
+              <Image source={{ uri: profile.profilePhoto }} style={styles.avatarImg} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+            )}
+            <View style={styles.cameraBtn}>
+              <Ionicons name="camera-outline" size={12} color="#fff" />
             </View>
             {profile?.role && profile.role !== 'USER' && (
               <View style={styles.roleBadge}>
@@ -75,7 +101,7 @@ export default function ProfileScreen({ navigation }: any) {
                 <Text style={styles.roleText}>{profile.role.replace('_', ' ')}</Text>
               </View>
             )}
-          </View>
+          </TouchableOpacity>
 
           <Text style={styles.name}>{profile?.name ?? '—'}</Text>
           <Text style={styles.contact}>{profile?.phone ?? profile?.email ?? '—'}</Text>
@@ -83,7 +109,7 @@ export default function ProfileScreen({ navigation }: any) {
           {/* Stats row */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{localEnrollments.length}</Text>
+              <Text style={styles.statValue}>{total}</Text>
               <Text style={styles.statLabel}>Enrollments</Text>
             </View>
             <View style={styles.statDivider} />
@@ -97,7 +123,7 @@ export default function ProfileScreen({ navigation }: any) {
               <Text style={styles.statLabel}>Academies</Text>
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
         {/* ── Menu Sections ────────────────────────────────── */}
         <View style={styles.menuArea}>
@@ -216,10 +242,11 @@ export default function ProfileScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
 
-  hero:    { alignItems: 'center', paddingTop: 56, paddingBottom: 28, paddingHorizontal: 20, overflow: 'hidden' },
-  heroBg:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: Colors.navy, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
-  avatarWrap: { alignItems: 'center', marginBottom: 12 },
-  avatar:  { width: 88, height: 88, borderRadius: 44, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.2)', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 12 },
+  hero:    { alignItems: 'center', paddingTop: 56, paddingBottom: 32, paddingHorizontal: 20 },
+  avatarWrap:  { alignItems: 'center', marginBottom: 12, position: 'relative' },
+  avatar:      { width: 88, height: 88, borderRadius: 44, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.2)', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 12 },
+  avatarImg:   { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: 'rgba(255,255,255,0.3)' },
+  cameraBtn:   { position: 'absolute', bottom: 14, right: -4, width: 26, height: 26, borderRadius: 13, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   avatarText: { fontSize: 30, fontWeight: FontWeight.extrabold, color: '#fff' },
   roleBadge:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: BorderRadius.full },
   roleText:   { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.5 },

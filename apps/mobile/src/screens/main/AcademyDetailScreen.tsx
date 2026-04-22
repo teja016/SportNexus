@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, FlatList, Image, TouchableOpacity,
   Linking, StyleSheet, Dimensions, ActivityIndicator, Animated,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useQuery } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { academyAPI } from '../../services/api'
@@ -12,6 +13,7 @@ import { SPORT_ICONS, formatCurrency } from '@sportnexus/utils'
 import { Academy, Coach, SportProgram } from '@sportnexus/types'
 import { Colors, FontSize, FontWeight, BorderRadius, Shadow, SportColors } from '../../constants/theme'
 import CoachDetailModal from '../../components/CoachDetailModal'
+import ReviewsModal from '../../components/ReviewsModal'
 import { MOCK_COACHES } from '../../constants/mockData'
 
 const { width } = Dimensions.get('window')
@@ -19,7 +21,8 @@ const PHOTO_HEIGHT = 300
 
 export default function AcademyDetailScreen({ route, navigation }: any) {
   const initialAcademy: Academy = route.params?.academy
-  const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null)
+  const [selectedCoach, setSelectedCoach]   = useState<Coach | null>(null)
+  const [showReviews, setShowReviews]       = useState(false)
   const [photoIndex, setPhotoIndex] = useState(0)
   const scrollY = useRef(new Animated.Value(0)).current
   const { setAcademy } = useEnrollmentStore()
@@ -42,8 +45,7 @@ export default function AcademyDetailScreen({ route, navigation }: any) {
   })
 
   function openDirections() {
-    const query = encodeURIComponent(`${academy.name}, ${academy.address}, ${academy.city}`)
-    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`)
+    Linking.openURL(`https://www.google.com/maps/?q=${academy.lat},${academy.lng}`)
   }
 
   function handleViewSlots(program: SportProgram) {
@@ -99,7 +101,10 @@ export default function AcademyDetailScreen({ route, navigation }: any) {
             )}
           />
           {/* Gradient overlay */}
-          <View style={styles.photoGradient} />
+          <LinearGradient
+            colors={['transparent', 'rgba(15,23,42,0.7)']}
+            style={styles.photoGradient}
+          />
 
           {/* Photo counter */}
           {photos.length > 1 && (
@@ -125,7 +130,7 @@ export default function AcademyDetailScreen({ route, navigation }: any) {
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.academyName}>{academy.name}</Text>
-              <View style={styles.ratingRow}>
+              <TouchableOpacity style={styles.ratingRow} onPress={() => setShowReviews(true)} activeOpacity={0.7}>
                 {[1,2,3,4,5].map((i) => (
                   <Ionicons
                     key={i} name={i <= Math.round(academy.rating) ? 'star' : 'star-outline'}
@@ -134,7 +139,8 @@ export default function AcademyDetailScreen({ route, navigation }: any) {
                 ))}
                 <Text style={styles.ratingText}>{academy.rating}</Text>
                 <Text style={styles.reviewCount}>({academy.reviewCount} reviews)</Text>
-              </View>
+                <Ionicons name="chevron-forward" size={13} color={Colors.textMuted} />
+              </TouchableOpacity>
             </View>
             {academy.isVerified && (
               <View style={styles.verifiedBadge}>
@@ -241,6 +247,16 @@ export default function AcademyDetailScreen({ route, navigation }: any) {
       {selectedCoach && (
         <CoachDetailModal coach={selectedCoach} onClose={() => setSelectedCoach(null)} />
       )}
+
+      {showReviews && (
+        <ReviewsModal
+          reviews={(academy as any).reviews ?? []}
+          academyName={academy.name}
+          academyId={academy.id}
+          overallRating={academy.rating}
+          onClose={() => setShowReviews(false)}
+        />
+      )}
     </View>
   )
 }
@@ -273,8 +289,7 @@ const styles = StyleSheet.create({
   },
 
   photoGradient: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, height: 80,
-    backgroundColor: 'transparent',
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 120,
   },
   photoCounter: {
     position: 'absolute', top: 56, right: 16,

@@ -4,9 +4,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors, FontSize, FontWeight, BorderRadius } from '../constants/theme'
 import { useLocalEnrollmentsStore } from '../store/localEnrollmentsStore'
+import { useNotificationsStore } from '../store/notificationsStore'
 
 import HomeScreen from '../screens/main/HomeScreen'
-import SearchScreen from '../screens/main/SearchScreen'
+import NotificationsScreen from '../screens/main/NotificationsScreen'
 import EnrollmentsScreen from '../screens/main/EnrollmentsScreen'
 import ProfileScreen from '../screens/main/ProfileScreen'
 
@@ -23,7 +24,9 @@ function EnrollmentsBadge({ count, color }: { count: number; color: string }) {
 
 export default function MainTabNavigator() {
   const { enrollments } = useLocalEnrollmentsStore()
+  const { notifications } = useNotificationsStore()
   const activeCount = enrollments.filter((e) => ['PENDING', 'CONFIRMED', 'ACTIVE'].includes(e.status)).length
+  const unreadNotifs = notifications.filter((n) => !n.read).length
 
   return (
     <Tab.Navigator
@@ -36,10 +39,10 @@ export default function MainTabNavigator() {
         tabBarItemStyle: styles.tabItem,
         tabBarIcon: ({ focused, color, size }) => {
           const icons: Record<string, [string, string]> = {
-            Home:        ['home',     'home-outline'],
-            Search:      ['search',   'search-outline'],
-            Enrollments: ['calendar', 'calendar-outline'],
-            Profile:     ['person',   'person-outline'],
+            Home:          ['home',          'home-outline'],
+            Notifications: ['notifications', 'notifications-outline'],
+            Enrollments:   ['calendar',      'calendar-outline'],
+            Profile:       ['person',        'person-outline'],
           }
           const [activeIcon, inactiveIcon] = icons[route.name] ?? ['ellipse', 'ellipse-outline']
           return (
@@ -48,32 +51,35 @@ export default function MainTabNavigator() {
               {route.name === 'Enrollments' && (
                 <EnrollmentsBadge count={activeCount} color={color} />
               )}
+              {route.name === 'Notifications' && unreadNotifs > 0 && (
+                <EnrollmentsBadge count={unreadNotifs} color={color} />
+              )}
             </View>
           )
         },
       })}
     >
-      <Tab.Screen name="Home"        component={HomeScreen} />
-      <Tab.Screen name="Search"      component={SearchScreen} />
-      <Tab.Screen name="Enrollments" component={EnrollmentsScreen} />
-      <Tab.Screen name="Profile"     component={ProfileScreen} />
+      <Tab.Screen name="Home"          component={HomeScreen} />
+      <Tab.Screen name="Notifications" component={NotificationsScreen} />
+      <Tab.Screen name="Enrollments"   component={EnrollmentsScreen} />
+      <Tab.Screen name="Profile"       component={ProfileScreen} />
     </Tab.Navigator>
   )
 }
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: Colors.surface,
-    borderTopColor: Colors.borderLight,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderTopColor: 'rgba(14,116,144,0.12)',
     borderTopWidth: 1,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 6,
-    paddingTop: 6,
-    height: Platform.OS === 'ios' ? 84 : 62,
-    elevation: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+    paddingTop: 8,
+    height: Platform.OS === 'ios' ? 88 : 66,
+    elevation: 20,
+    shadowColor: '#0D9488',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 20,
   },
   tabLabel: {
     fontSize: FontSize.xs,

@@ -128,6 +128,9 @@ export const academyAPI = {
 
   getPrograms: (academyId: string) =>
     api.get(`/academies/${academyId}/programs`).then((r) => r.data.data),
+
+  submitReview: (academyId: string, data: { rating: number; comment: string }) =>
+    api.post(`/academies/${academyId}/reviews`, data).then((r) => r.data.data),
 }
 
 // ─── Slot API ─────────────────────────────────────────────────────────────────
@@ -145,7 +148,7 @@ export const slotAPI = {
 export const enrollmentAPI = {
   create: (data: {
     slotId: string; transportOpted: boolean; pickupLat?: number; pickupLng?: number;
-    pickupAddress?: string; pickupDistance?: number; durationMonths: number
+    pickupAddress?: string; pickupDistance?: number; durationMonths: number; startDate?: string
   }) => api.post('/enrollments', data).then((r) => r.data.data),
 
   getMyEnrollments: (status?: string) =>
@@ -169,10 +172,14 @@ export const paymentAPI = {
 // ─── Transit API ──────────────────────────────────────────────────────────────
 
 export const transitAPI = {
-  getToday:    ()                        => api.get('/transit/today').then((r) => r.data.data),
-  getById:     (id: string)              => api.get(`/transit/${id}`).then((r) => r.data.data),
-  cancelToday: (id: string)              => api.post(`/transit/${id}/cancel-today`).then((r) => r.data.data),
-  initSession: (enrollmentId: string)    => api.post('/transit/init-session', { enrollmentId }).then((r) => r.data.data),
+  getToday:          ()                                    => api.get('/transit/today').then((r) => r.data.data),
+  getById:           (id: string)                          => api.get(`/transit/${id}`).then((r) => r.data.data),
+  cancelToday:       (id: string)                          => api.post(`/transit/${id}/cancel-today`).then((r) => r.data.data),
+  initSession:       (enrollmentId: string)                => api.post('/transit/init-session', { enrollmentId }).then((r) => r.data.data),
+  getDriverToday:    ()                                    => api.get('/transit/driver/today').then((r) => r.data.data),
+  updateDriverStatus:(id: string, status: string)          => api.patch(`/transit/${id}/driver-status`, { status }).then((r) => r.data.data),
+  updateLocation:    (id: string, lat: number, lng: number, etaMinutes?: number) =>
+    api.patch(`/transit/${id}/driver-location`, { lat, lng, etaMinutes }).then((r) => r.data.data),
 }
 
 export default api

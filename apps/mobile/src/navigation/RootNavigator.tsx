@@ -11,6 +11,8 @@ import RegisterScreen from '../screens/auth/RegisterScreen'
 import OTPVerifyScreen from '../screens/auth/OTPVerifyScreen'
 import LocationSetupScreen from '../screens/auth/LocationSetupScreen'
 import MainTabNavigator from './MainTabNavigator'
+import DriverHomeScreen from '../screens/driver/DriverHomeScreen'
+import DriverActiveScreen from '../screens/driver/DriverActiveScreen'
 import AcademyDetailScreen from '../screens/main/AcademyDetailScreen'
 import EnrollmentDetailScreen from '../screens/main/EnrollmentDetailScreen'
 import SlotsScreen from '../screens/main/SlotsScreen'
@@ -32,7 +34,8 @@ const headerStyle = {
 }
 
 export default function RootNavigator() {
-  const { isAuthenticated, isOnboarded, locationSetup } = useAuthStore()
+  const { isAuthenticated, isOnboarded, locationSetup, user } = useAuthStore()
+  const isDriver = user?.role === 'DRIVER'
 
   return (
     <NavigationContainer>
@@ -51,6 +54,11 @@ export default function RootNavigator() {
           </>
         ) : !locationSetup ? (
           <Stack.Screen name="LocationSetup" component={LocationSetupScreen} />
+        ) : isDriver ? (
+          <>
+            <Stack.Screen name="DriverHome"   component={DriverHomeScreen}   options={{ headerShown: false }} />
+            <Stack.Screen name="DriverActive" component={DriverActiveScreen} options={{ headerShown: false }} />
+          </>
         ) : (
           <>
             <Stack.Screen name="MainTabs"  component={MainTabNavigator} />

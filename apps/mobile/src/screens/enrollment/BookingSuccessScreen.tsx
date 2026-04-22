@@ -1,12 +1,47 @@
 import React, { useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Share, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Share, ScrollView, Platform, Linking } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import QRCode from 'react-native-qrcode-svg'
 import { Ionicons } from '@expo/vector-icons'
+import * as Notifications from 'expo-notifications'
 import { Colors, FontSize, FontWeight, BorderRadius, Shadow } from '../../constants/theme'
+import { useNotificationsStore } from '../../store/notificationsStore'
+
+async function sendEnrollmentNotification(bookingRef: string, academyName?: string) {
+  if (Platform.OS === 'web') return
+  try {
+    const { status } = await Notifications.requestPermissionsAsync()
+    if (status !== 'granted') return
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Successfully Enrolled! 🎉',
+        body: academyName
+          ? `Your booking at ${academyName} is confirmed. Ref: #${bookingRef}`
+          : `Your booking is confirmed. Reference: #${bookingRef}`,
+        sound: true,
+      },
+      trigger: null,
+    })
+  } catch { /* silent */ }
+}
 
 export default function BookingSuccessScreen({ route, navigation }: any) {
-  const { enrollmentId } = route.params ?? {}
+  const { enrollmentId, academyName, slotTimeStart, slotDays } = route.params ?? {}
   const bookingRef = (enrollmentId ?? 'UNKNOWN').slice(-8).toUpperCase()
+  const addNotification = useNotificationsStore((s) => s.addNotification)
+
+  function handleAddToCalendar() {
+    const title = encodeURIComponent(`SportNexus — ${academyName ?? 'Training Session'}`)
+    const details = encodeURIComponent(`Booking Ref: #${bookingRef}`)
+    const now = new Date()
+    const [h = '6', m = '0'] = (slotTimeStart ?? '06:00').split(':')
+    now.setHours(parseInt(h), parseInt(m), 0, 0)
+    const end = new Date(now.getTime() + 60 * 60 * 1000)
+    const fmt = (d: Date) =>
+      d.toISOString().replace(/[-:]/g, '').replace('.000', '')
+    const url = `https://calendar.google.com/calendar/r/eventedit?text=${title}&details=${details}&dates=${fmt(now)}/${fmt(end)}&recur=RRULE:FREQ=WEEKLY`
+    Linking.openURL(url)
+  }
 
   const checkScale   = useRef(new Animated.Value(0)).current
   const checkOpacity = useRef(new Animated.Value(0)).current
@@ -18,6 +53,17 @@ export default function BookingSuccessScreen({ route, navigation }: any) {
   const ring2Opacity = useRef(new Animated.Value(0.3)).current
 
   useEffect(() => {
+    sendEnrollmentNotification(bookingRef, academyName)
+    addNotification({
+      type: 'ENROLLED',
+      title: 'Enrollment Confirmed! 🎉',
+      body: academyName
+        ? `Your booking at ${academyName} is confirmed. Ref: #${bookingRef}`
+        : `Your booking is confirmed. Reference: #${bookingRef}`,
+      enrollmentId,
+      academyName,
+    })
+
     // Check animation
     Animated.sequence([
       Animated.spring(checkScale, { toValue: 1, tension: 80, friction: 5, useNativeDriver: true }),
@@ -86,6 +132,14 @@ export default function BookingSuccessScreen({ route, navigation }: any) {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      {/* ── Gradient background top ─────────────────────── */}
+      <LinearGradient
+        colors={['#0D9488', '#1E3A5F', Colors.background]}
+        start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+        locations={[0, 0.35, 0.7]}
+      />
+
       {/* ── Success Icon ─────────────────────────────────── */}
       <View style={styles.iconArea}>
         {/* Ripples */}
@@ -142,8 +196,15 @@ export default function BookingSuccessScreen({ route, navigation }: any) {
           <Text style={styles.shareBtnText}>Share</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.viewBtn} onPress={handleViewEnrollment}>
+        <TouchableOpacity style={styles.shareBtn} onPress={handleAddToCalendar}>
           <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+          <Text style={styles.shareBtnText}>Calendar</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      <Animated.View style={[styles.actions, { opacity: cardOpacity, transform: [{ translateY: cardSlide }] }]}>
+        <TouchableOpacity style={styles.viewBtn} onPress={handleViewEnrollment}>
+          <Ionicons name="eye-outline" size={18} color={Colors.primary} />
           <Text style={styles.viewBtnText}>View Enrollment</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -160,7 +221,7 @@ export default function BookingSuccessScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  content:   { alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 48, gap: 24 },
+  content:   { alignItems: 'center', paddingHorizontal: 24, paddingTop: 64, paddingBottom: 48, gap: 24 },
 
   iconArea:   { alignItems: 'center', justifyContent: 'center', height: 140, width: 140 },
   ring:       { position: 'absolute', width: 110, height: 110, borderRadius: 55, borderWidth: 2, borderColor: Colors.accent },
@@ -172,8 +233,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.45, shadowRadius: 20, elevation: 16,
   },
 
-  title:    { fontSize: FontSize['2xl'], fontWeight: FontWeight.extrabold, color: Colors.textPrimary, textAlign: 'center', letterSpacing: -0.5 },
-  subtitle: { fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22, marginTop: 6, paddingHorizontal: 8 },
+  title:    { fontSize: FontSize['2xl'], fontWeight: FontWeight.extrabold, color: '#fff', textAlign: 'center', letterSpacing: -0.5 },
+  subtitle: { fontSize: FontSize.base, color: 'rgba(255,255,255,0.75)', textAlign: 'center', lineHeight: 22, marginTop: 6, paddingHorizontal: 8 },
 
   bookingCard: {
     width: '100%', backgroundColor: Colors.surface, borderRadius: BorderRadius.xl,
