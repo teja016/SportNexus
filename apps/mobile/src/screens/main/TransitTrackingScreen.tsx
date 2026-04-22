@@ -226,8 +226,8 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
     )
   }
 
-  // ── State: loading / auto-init ────────────────────────────────────────────
-  if ((trackState === 'no-session' && !passengerLoading) || (sessionLoading && !session && !todayPassenger)) {
+  // ── State: initial loading ────────────────────────────────────────────────
+  if (passengerLoading || (sessionLoading && !session)) {
     return (
       <View style={styles.stateContainer}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -235,6 +235,27 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
         </TouchableOpacity>
         <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>Loading transport info...</Text>
+      </View>
+    )
+  }
+
+  // ── State: no session today ───────────────────────────────────────────────
+  if (trackState === 'no-session') {
+    return (
+      <View style={styles.stateContainer}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <View style={styles.stateIcon}>
+          <Text style={{ fontSize: 48 }}>🚌</Text>
+        </View>
+        <Text style={styles.stateTitle}>No Transport Today</Text>
+        <Text style={styles.stateSub}>
+          There's no transport session scheduled for today. Sessions are generated automatically each morning.
+        </Text>
+        <TouchableOpacity style={styles.goBackBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.goBackBtnText}>Back to Enrollments</Text>
+        </TouchableOpacity>
       </View>
     )
   }
@@ -340,18 +361,6 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
   }
 
   // ── State: pre-pickup & live tracking ────────────────────────────────────
-  // Guard: if session still loading after state transition, show spinner
-  if (!session && sessionLoading) {
-    return (
-      <View style={styles.stateContainer}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Loading tracking info...</Text>
-      </View>
-    )
-  }
 
   return (
     <View style={styles.container}>
