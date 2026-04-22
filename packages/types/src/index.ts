@@ -3,7 +3,8 @@
 export type UserRole = 'USER' | 'ACADEMY_ADMIN' | 'SUPER_ADMIN' | 'TRANSPORT_OPERATOR' | 'DRIVER'
 export type EnrollmentStatus = 'PENDING' | 'CONFIRMED' | 'ACTIVE' | 'CANCELLED' | 'EXPIRED'
 export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED'
-export type TransitStatus = 'SCHEDULED' | 'DISPATCHED' | 'ARRIVING' | 'PICKED_UP' | 'AT_ACADEMY' | 'COMPLETED'
+export type TransitStatus = 'SCHEDULED' | 'DISPATCHED' | 'ARRIVING' | 'PICKED_UP' | 'AT_ACADEMY' | 'COMPLETED' | 'CANCELLED_BY_USER'
+export type PassengerStatus = 'WAITING' | 'PICKED_UP' | 'ABSENT'
 
 // ─── Core Models ──────────────────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ export interface Slot {
   daysOfWeek: string[]
   totalCapacity: number
   enrolledCount: number
+  transportCapacity: number
   isActive: boolean
   // Relations
   program?: SportProgram
@@ -121,7 +123,7 @@ export interface Enrollment {
   user?: Pick<User, 'id' | 'name' | 'phone'>
   slot?: Slot & { program?: SportProgram & { academy?: Academy } }
   payment?: Payment
-  transitSessions?: TransitSession[]
+  transitPassenger?: TransitPassenger
 }
 
 export interface Payment {
@@ -153,9 +155,20 @@ export interface TransportRoute {
   isActive: boolean
 }
 
+export interface TransitPassenger {
+  id: string
+  sessionId: string
+  enrollmentId: string
+  stopOrder: number
+  status: PassengerStatus
+  pickedUpAt?: string | null
+  createdAt: string
+  enrollment?: Enrollment
+}
+
 export interface TransitSession {
   id: string
-  enrollmentId: string
+  slotId: string
   date: string
   status: TransitStatus
   driverLat?: number | null
@@ -164,10 +177,12 @@ export interface TransitSession {
   driverName?: string | null
   driverPhone?: string | null
   vehicleNumber?: string | null
+  driverUserId?: string | null
   createdAt: string
   updatedAt: string
   // Relations
-  enrollment?: Enrollment
+  slot?: Slot & { program?: SportProgram & { academy?: Academy } }
+  passengers?: TransitPassenger[]
 }
 
 export interface Review {

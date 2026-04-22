@@ -42,6 +42,12 @@ enum TransitStatus {
   CANCELLED_BY_USER
 }
 
+enum PassengerStatus {
+  WAITING
+  PICKED_UP
+  ABSENT
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model User {
@@ -150,17 +156,19 @@ model SportProgram {
 }
 
 model Slot {
-  id            String   @id @default(cuid())
-  programId     String
-  timeStart     String
-  timeEnd       String
-  daysOfWeek    String[]
-  totalCapacity Int
-  enrolledCount Int      @default(0)
-  isActive      Boolean  @default(true)
+  id                String   @id @default(cuid())
+  programId         String
+  timeStart         String
+  timeEnd           String
+  daysOfWeek        String[]
+  totalCapacity     Int
+  enrolledCount     Int      @default(0)
+  transportCapacity Int      @default(20)
+  isActive          Boolean  @default(true)
 
-  program     SportProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
-  enrollments Enrollment[]
+  program         SportProgram     @relation(fields: [programId], references: [id], onDelete: Cascade)
+  enrollments     Enrollment[]
+  transitSessions TransitSession[]
 
   @@index([programId])
 }
@@ -182,10 +190,10 @@ model Enrollment {
   expiresAt      DateTime?
   updatedAt      DateTime         @updatedAt
 
-  user            User             @relation(fields: [userId], references: [id])
-  slot            Slot             @relation(fields: [slotId], references: [id])
-  payment         Payment?
-  transitSessions TransitSession[]
+  user             User              @relation(fields: [userId], references: [id])
+  slot             Slot              @relation(fields: [slotId], references: [id])
+  payment          Payment?
+  transitPassenger TransitPassenger?
 
   @@unique([userId, slotId])
   @@index([userId])
@@ -234,28 +242,44 @@ model TransportRoute {
 
 model TransitSession {
   id            String        @id @default(cuid())
-  enrollmentId  String
+  slotId        String
   date          DateTime
   status        TransitStatus @default(SCHEDULED)
   driverLat     Float?
   driverLng     Float?
   etaMinutes    Int?
-  driverName     String?
-  driverPhone    String?
-  vehicleNumber  String?
-  driverUserId   String?
-  userConfirmed  Boolean       @default(false)
-  cancelledAt    DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  driverName    String?
+  driverPhone   String?
+  vehicleNumber String?
+  driverUserId  String?
+  cancelledAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
-  driverUser User?      @relation("DriverSessions", fields: [driverUserId], references: [id])
+  slot       Slot               @relation(fields: [slotId], references: [id])
+  driverUser User?              @relation("DriverSessions", fields: [driverUserId], references: [id])
+  passengers TransitPassenger[]
 
-  @@unique([enrollmentId, date])
-  @@index([enrollmentId])
+  @@unique([slotId, date])
+  @@index([slotId])
   @@index([date])
   @@index([driverUserId])
+}
+
+model TransitPassenger {
+  id           String          @id @default(cuid())
+  sessionId    String
+  enrollmentId String          @unique
+  stopOrder    Int
+  status       PassengerStatus @default(WAITING)
+  pickedUpAt   DateTime?
+  createdAt    DateTime        @default(now())
+
+  session    TransitSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  enrollment Enrollment     @relation(fields: [enrollmentId], references: [id])
+
+  @@index([sessionId])
+  @@index([enrollmentId])
 }
 
 model Review {

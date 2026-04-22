@@ -356,7 +356,7 @@ async function main() {
   // ─── Test Enrollments + Today's Transit Sessions ─────────────────────────
   const enrollment1 = await prisma.enrollment.upsert({
     where: { id: 'enroll_test_1' },
-    update: {},
+    update: { status: 'CONFIRMED', transportOpted: true },
     create: {
       id: 'enroll_test_1',
       userId: testUser.id,
@@ -374,7 +374,7 @@ async function main() {
 
   const enrollment2 = await prisma.enrollment.upsert({
     where: { id: 'enroll_test_2' },
-    update: {},
+    update: { status: 'CONFIRMED', transportOpted: true },
     create: {
       id: 'enroll_test_2',
       userId: testUser.id,
@@ -393,11 +393,12 @@ async function main() {
   const todayStart = new Date()
   todayStart.setUTCHours(0, 0, 0, 0)
 
-  await prisma.transitSession.upsert({
-    where: { enrollmentId_date: { enrollmentId: enrollment1.id, date: todayStart } },
-    update: { driverUserId: driver1.id },
+  // One session per slot (new schema: slotId_date unique)
+  const session1 = await prisma.transitSession.upsert({
+    where: { slotId_date: { slotId: 'slot_champ_j_m1', date: todayStart } },
+    update: { driverUserId: driver1.id, driverName: 'Teja Reddy', driverPhone: '+917777777771', vehicleNumber: 'TS09EA1234' },
     create: {
-      enrollmentId: enrollment1.id,
+      slotId: 'slot_champ_j_m1',
       date: todayStart,
       status: 'SCHEDULED',
       driverUserId: driver1.id,
@@ -407,11 +408,11 @@ async function main() {
     },
   })
 
-  await prisma.transitSession.upsert({
-    where: { enrollmentId_date: { enrollmentId: enrollment2.id, date: todayStart } },
-    update: { driverUserId: driver2.id },
+  const session2 = await prisma.transitSession.upsert({
+    where: { slotId_date: { slotId: 'slot_kick_u12_m1', date: todayStart } },
+    update: { driverUserId: driver2.id, driverName: 'Teja Reddy 2', driverPhone: '+917777777772', vehicleNumber: 'TS10FB5678' },
     create: {
-      enrollmentId: enrollment2.id,
+      slotId: 'slot_kick_u12_m1',
       date: todayStart,
       status: 'SCHEDULED',
       driverUserId: driver2.id,
@@ -421,7 +422,20 @@ async function main() {
     },
   })
 
-  console.log('✅ Created test enrollments + today\'s transit sessions')
+  // TransitPassengers — one per enrollment, linking to session
+  await prisma.transitPassenger.upsert({
+    where: { enrollmentId: enrollment1.id },
+    update: { sessionId: session1.id, stopOrder: 1 },
+    create: { sessionId: session1.id, enrollmentId: enrollment1.id, stopOrder: 1, status: 'WAITING' },
+  })
+
+  await prisma.transitPassenger.upsert({
+    where: { enrollmentId: enrollment2.id },
+    update: { sessionId: session2.id, stopOrder: 1 },
+    create: { sessionId: session2.id, enrollmentId: enrollment2.id, stopOrder: 1, status: 'WAITING' },
+  })
+
+  console.log('✅ Created test enrollments + today\'s transit sessions + passengers')
 
   console.log('\n🎉 Database seeded successfully!')
   console.log('\n📋 Test credentials:')

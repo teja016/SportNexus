@@ -6,7 +6,6 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../store/authStore'
-import { useLocalEnrollmentsStore } from '../../store/localEnrollmentsStore'
 import { Colors, FontSize, BorderRadius, Shadow } from '../../constants/theme'
 import TrackingMap from '../../components/TrackingMap'
 import DriverDetailModal, { DriverDetails } from '../../components/DriverDetailModal'
@@ -54,11 +53,10 @@ type TrackState =
   | 'completed'
   | 'cancelled'
 
-function deriveState(session: any, enrollmentFromStore: any, timeStart?: string): TrackState {
+function deriveState(session: any, passenger: any, timeStart?: string): TrackState {
   if (!session) {
-    // Check if startDate is in the future
-    const startDate = enrollmentFromStore?.startDate
-      ? new Date(enrollmentFromStore.startDate)
+    const startDate = passenger?.enrollment?.startDate
+      ? new Date(passenger.enrollment.startDate)
       : null
     if (startDate) {
       const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -83,28 +81,23 @@ function deriveState(session: any, enrollmentFromStore: any, timeStart?: string)
 export default function TransitTrackingScreen({ route, navigation }: any) {
   const { sessionId: paramSessionId, enrollmentId } = route.params ?? {}
   const { userLat, userLng } = useAuthStore()
-  const { enrollments } = useLocalEnrollmentsStore()
   const queryClient = useQueryClient()
   const [showDriver, setShowDriver] = useState(false)
   const [countdown, setCountdown] = useState('')
   const [, forceUpdate] = useState(0)
 
-  const enrollmentFromStore = enrollments.find(
-    (e) => e.id === (enrollmentId ?? paramSessionId)
-  )
-
-  // Resolve sessionId: param → today's list → undefined
-  const { data: todaySessions } = useQuery({
+  // Fetch today's passenger record (contains session + stop position)
+  const { data: todayPassenger, isLoading: passengerLoading } = useQuery({
     queryKey: ['transit-today'],
     queryFn:  () => transitAPI.getToday(),
-    enabled:  !paramSessionId,
     staleTime: 30_000,
+    refetchInterval: 60_000,
   })
-  const resolvedSessionId: string | undefined =
-    paramSessionId ??
-    todaySessions?.find((s: any) => s.enrollmentId === enrollmentId)?.id
 
-  // Fetch session detail
+  const resolvedSessionId: string | undefined =
+    paramSessionId ?? todayPassenger?.session?.id
+
+  // Fetch full session detail (live data, frequent refresh)
   const { data: session, isLoading: sessionLoading } = useQuery({
     queryKey: ['transit-session', resolvedSessionId],
     queryFn:  () => transitAPI.getById(resolvedSessionId!),
@@ -113,26 +106,25 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
     refetchInterval: 30_000,
   })
 
-  // Auto-init session if no session and startDate is today
-  const initMutation = useMutation({
-    mutationFn: () => transitAPI.initSession(enrollmentId!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transit-today'] })
-    },
-  })
-
   const sessionId = resolvedSessionId
   const { location, eta, status: socketStatus, isConnected } = useTransitSocket(sessionId ?? '')
 
-  const slot      = session?.enrollment?.slot
+  const slot      = session?.slot
   const timeStart = slot?.timeStart
   const academy   = slot?.program?.academy
+
+  // Find this user's stop info from session passengers
+  const myPassenger = session?.passengers?.find(
+    (p: any) => p.id === todayPassenger?.id || p.enrollmentId === todayPassenger?.enrollmentId
+  ) ?? todayPassenger
+  const myStopOrder   = myPassenger?.stopOrder ?? 1
+  const totalStops    = session?.passengers?.length ?? 1
 
   const mergedStatus = socketStatus !== 'SCHEDULED'
     ? socketStatus
     : (session?.status ?? 'SCHEDULED')
 
-  const trackState = deriveState(session, enrollmentFromStore, timeStart)
+  const trackState = deriveState(session, todayPassenger, timeStart)
 
   // Countdown ticker — runs every 30s normally, every 5s in last 3 minutes, forces re-render when it hits 0
   useEffect(() => {
@@ -140,7 +132,7 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
     const tick = () => {
       const msLeft = msUntilTime(timeStart) - 45 * 60000
       setCountdown(formatCountdown(msLeft))
-      if (msLeft <= 0) forceUpdate((n) => n + 1)   // trigger state re-derive when window opens
+      if (msLeft <= 0) forceUpdate((n) => n + 1)
     }
     tick()
     const msLeft = msUntilTime(timeStart) - 45 * 60000
@@ -149,15 +141,8 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
     return () => clearInterval(id)
   }, [timeStart])
 
-  // Auto-init today's session when no session found
-  useEffect(() => {
-    if (trackState === 'no-session' && enrollmentId && !initMutation.isPending && !initMutation.isSuccess) {
-      initMutation.mutate()
-    }
-  }, [trackState])
-
-  const pickupLat = userLat ?? 17.4337
-  const pickupLng = userLng ?? 78.4076
+  const pickupLat = todayPassenger?.enrollment?.pickupLat ?? userLat ?? 17.4337
+  const pickupLng = todayPassenger?.enrollment?.pickupLng ?? userLng ?? 78.4076
   const destLat   = academy?.lat ?? 17.4156
   const destLng   = academy?.lng ?? 78.4347
 
@@ -211,8 +196,8 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
 
   // ── State: future start date ──────────────────────────────────────────────
   if (trackState === 'future') {
-    const startDate = enrollmentFromStore?.startDate
-      ? new Date(enrollmentFromStore.startDate as any).toLocaleDateString('en-IN', {
+    const startDate = todayPassenger?.enrollment?.startDate
+      ? new Date(todayPassenger.enrollment.startDate).toLocaleDateString('en-IN', {
           weekday: 'short', day: 'numeric', month: 'long',
         })
       : 'your start date'
@@ -242,14 +227,14 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
   }
 
   // ── State: loading / auto-init ────────────────────────────────────────────
-  if (trackState === 'no-session' || (sessionLoading && !session)) {
+  if ((trackState === 'no-session' && !passengerLoading) || (sessionLoading && !session && !todayPassenger)) {
     return (
       <View style={styles.stateContainer}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Setting up your transport...</Text>
+        <Text style={styles.loadingText}>Loading transport info...</Text>
       </View>
     )
   }
@@ -402,7 +387,7 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
       )}
 
       <View style={styles.bottomSheet}>
-        {/* ETA */}
+        {/* ETA + Stop position */}
         <View style={styles.etaBanner}>
           <View style={{ flex: 1 }}>
             <Text style={styles.etaLabel}>Estimated Arrival</Text>
@@ -414,10 +399,18 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
                                              : 'Driver on the way'}
             </Text>
           </View>
-          <View style={styles.statusPill}>
-            <Text style={styles.statusPillText}>
-              {STATUS_STEPS[currentStep]?.label ?? mergedStatus}
-            </Text>
+          <View style={{ gap: 6, alignItems: 'flex-end' }}>
+            <View style={styles.statusPill}>
+              <Text style={styles.statusPillText}>
+                {STATUS_STEPS[currentStep]?.label ?? mergedStatus}
+              </Text>
+            </View>
+            {totalStops > 1 && (
+              <View style={styles.stopPill}>
+                <Ionicons name="flag-outline" size={11} color={Colors.navy} />
+                <Text style={styles.stopPillText}>Stop {myStopOrder} of {totalStops}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -543,6 +536,8 @@ const styles = StyleSheet.create({
   etaValue:          { fontSize: FontSize.xl, fontWeight: '800', color: Colors.textPrimary, marginTop: 2 },
   statusPill:        { backgroundColor: Colors.tealLight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: BorderRadius.full },
   statusPillText:    { fontSize: FontSize.xs, color: Colors.primary, fontWeight: '700' },
+  stopPill:          { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: BorderRadius.full },
+  stopPillText:      { fontSize: FontSize.xs, color: Colors.navy, fontWeight: '700' },
 
   driverCard:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
   driverAvatar:      { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.tealLight, alignItems: 'center', justifyContent: 'center' },

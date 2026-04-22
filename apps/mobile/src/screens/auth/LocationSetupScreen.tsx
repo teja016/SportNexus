@@ -14,13 +14,13 @@ export default function LocationSetupScreen() {
   const [focused, setFocused] = useState(false)
   const { setLocation } = useAuthStore()
 
-  const pinScale   = useRef(new Animated.Value(0.8)).current
-  const ring1Scale = useRef(new Animated.Value(1)).current
+  const pinScale     = useRef(new Animated.Value(0.8)).current
+  const ring1Scale   = useRef(new Animated.Value(1)).current
   const ring1Opacity = useRef(new Animated.Value(0.5)).current
-  const ring2Scale = useRef(new Animated.Value(1)).current
+  const ring2Scale   = useRef(new Animated.Value(1)).current
   const ring2Opacity = useRef(new Animated.Value(0.3)).current
-  const slideUp    = useRef(new Animated.Value(40)).current
-  const fadeIn     = useRef(new Animated.Value(0)).current
+  const slideUp      = useRef(new Animated.Value(40)).current
+  const fadeIn       = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     Animated.parallel([
@@ -39,6 +39,7 @@ export default function LocationSetupScreen() {
         Animated.timing(ring1Opacity, { toValue: 0.5, duration: 0, useNativeDriver: true }),
       ]),
     ])).start()
+
     Animated.loop(Animated.sequence([
       Animated.delay(500),
       Animated.parallel([
@@ -77,14 +78,21 @@ export default function LocationSetupScreen() {
   }
 
   return (
-    <LinearGradient colors={['#0F172A', '#1E3A5F', '#0D2137']} style={styles.container}>
-      {/* Decorative circles */}
-      <View style={styles.deco1} />
-      <View style={styles.deco2} />
+    <View style={styles.container}>
+      <LinearGradient
+        colors={[Colors.primary, Colors.navy]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.heroStrip}
+      >
+        <View style={styles.heroIconBg}>
+          <Ionicons name="map-outline" size={32} color="#fff" />
+        </View>
+        <Text style={styles.heroLabel}>SportNexus</Text>
+      </LinearGradient>
 
       <Animated.View style={[styles.content, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
 
-        {/* Pin hero */}
         <View style={styles.pinArea}>
           <Animated.View style={[styles.ring, { transform: [{ scale: ring1Scale }], opacity: ring1Opacity }]} />
           <Animated.View style={[styles.ring, styles.ring2, { transform: [{ scale: ring2Scale }], opacity: ring2Opacity }]} />
@@ -98,7 +106,6 @@ export default function LocationSetupScreen() {
         <Text style={styles.heading}>Where are you?</Text>
         <Text style={styles.sub}>We'll find the best sports academies near your location</Text>
 
-        {/* GPS button */}
         <TouchableOpacity style={styles.gpsBtn} onPress={useCurrentLocation} disabled={loading} activeOpacity={0.88}>
           <LinearGradient colors={[Colors.primary, '#0A6E65']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gpsBtnGrad}>
             {loading ? <ActivityIndicator color="#fff" /> : (
@@ -110,20 +117,18 @@ export default function LocationSetupScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Divider */}
         <View style={styles.dividerRow}>
           <View style={styles.divider} />
           <Text style={styles.orText}>or enter manually</Text>
           <View style={styles.divider} />
         </View>
 
-        {/* Manual input */}
         <View style={[styles.inputWrap, focused && styles.inputWrapFocused]}>
-          <Ionicons name="search-outline" size={18} color={focused ? Colors.primary : 'rgba(255,255,255,0.35)'} />
+          <Ionicons name="search-outline" size={18} color={focused ? Colors.primary : '#9CA3AF'} />
           <TextInput
             style={styles.input}
             placeholder="Area or city (e.g. Banjara Hills)"
-            placeholderTextColor="rgba(255,255,255,0.3)"
+            placeholderTextColor="#9CA3AF"
             value={manual}
             onChangeText={setManual}
             onFocus={() => setFocused(true)}
@@ -134,7 +139,7 @@ export default function LocationSetupScreen() {
 
         <TouchableOpacity style={styles.manualBtn} onPress={useManual} activeOpacity={0.85}>
           <Text style={styles.manualBtnText}>Continue with this Location</Text>
-          <Ionicons name="arrow-forward" size={16} color="rgba(255,255,255,0.8)" />
+          <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setLocation(HYDERABAD.lat, HYDERABAD.lng, HYDERABAD.address)} style={styles.skipBtn}>
@@ -142,40 +147,63 @@ export default function LocationSetupScreen() {
         </TouchableOpacity>
 
       </Animated.View>
-    </LinearGradient>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  deco1: { position: 'absolute', width: 280, height: 280, borderRadius: 140, backgroundColor: 'rgba(13,148,136,0.06)', top: -80, right: -80 },
-  deco2: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(30,58,95,0.4)', bottom: -40, left: -60 },
+  container: { flex: 1, backgroundColor: Colors.background },
+
+  heroStrip: {
+    height: 120, flexDirection: 'row',
+    alignItems: 'flex-end', paddingHorizontal: 24, paddingBottom: 20, gap: 12,
+  },
+  heroIconBg: {
+    width: 52, height: 52, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)',
+  },
+  heroLabel: { fontSize: FontSize.xl, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -0.3 },
+
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 20 },
 
-  pinArea:  { alignItems: 'center', justifyContent: 'center', height: 140, width: 140 },
-  ring:     { position: 'absolute', width: 100, height: 100, borderRadius: 50, borderWidth: 2, borderColor: Colors.primary },
-  ring2:    { width: 130, height: 130, borderRadius: 65, borderColor: 'rgba(13,148,136,0.4)' },
-  pinCircle:{ shadowColor: Colors.primary, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.6, shadowRadius: 28, elevation: 20 },
-  pinGrad:  { width: 88, height: 88, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  pinArea:   { alignItems: 'center', justifyContent: 'center', height: 140, width: 140 },
+  ring:      { position: 'absolute', width: 100, height: 100, borderRadius: 50, borderWidth: 2, borderColor: Colors.primary },
+  ring2:     { width: 130, height: 130, borderRadius: 65, borderColor: Colors.primary + '55' },
+  pinCircle: {
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3, shadowRadius: 20, elevation: 16,
+  },
+  pinGrad: { width: 88, height: 88, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
 
-  heading: { fontSize: FontSize['2xl'], fontWeight: FontWeight.black, color: '#fff', letterSpacing: -0.5, textAlign: 'center' },
-  sub:     { fontSize: FontSize.base, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 22, marginTop: -8 },
+  heading: { fontSize: FontSize['2xl'], fontWeight: FontWeight.black, color: Colors.textPrimary, letterSpacing: -0.5, textAlign: 'center' },
+  sub:     { fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22, marginTop: -8 },
 
-  gpsBtn:     { width: '100%', borderRadius: BorderRadius.lg, overflow: 'hidden', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 12 },
+  gpsBtn: {
+    width: '100%', borderRadius: BorderRadius.lg, overflow: 'hidden',
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3, shadowRadius: 16, elevation: 10,
+  },
   gpsBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
   gpsBtnText: { color: '#fff', fontSize: FontSize.lg, fontWeight: FontWeight.bold },
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%' },
-  divider:    { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
-  orText:     { color: 'rgba(255,255,255,0.35)', fontSize: FontSize.sm },
+  divider:    { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
+  orText:     { color: Colors.textMuted, fontSize: FontSize.sm },
 
-  inputWrap:       { flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: BorderRadius.md, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)' },
-  inputWrapFocused:{ borderColor: Colors.primary, backgroundColor: 'rgba(13,148,136,0.12)' },
-  input:           { flex: 1, fontSize: FontSize.base, color: '#fff' },
+  inputWrap:        { flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%', backgroundColor: '#FFFFFF', borderRadius: BorderRadius.md, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: '#E5E7EB' },
+  inputWrapFocused: { borderColor: Colors.primary, borderWidth: 1.5 },
+  input:            { flex: 1, fontSize: FontSize.base, color: Colors.textPrimary },
 
-  manualBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: BorderRadius.md, paddingVertical: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  manualBtnText: { color: 'rgba(255,255,255,0.8)', fontSize: FontSize.base, fontWeight: FontWeight.semibold },
+  manualBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    width: '100%', backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.md, paddingVertical: 14,
+    borderWidth: 1.5, borderColor: Colors.primary,
+  },
+  manualBtnText: { color: Colors.primary, fontSize: FontSize.base, fontWeight: FontWeight.semibold },
 
   skipBtn:  { marginTop: 4 },
-  skipText: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.3)', textDecorationLine: 'underline' },
+  skipText: { fontSize: FontSize.sm, color: Colors.textMuted, textDecorationLine: 'underline' },
 })

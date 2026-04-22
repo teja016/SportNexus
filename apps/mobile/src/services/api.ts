@@ -172,14 +172,21 @@ export const paymentAPI = {
 // ─── Transit API ──────────────────────────────────────────────────────────────
 
 export const transitAPI = {
-  getToday:          ()                                    => api.get('/transit/today').then((r) => r.data.data),
-  getById:           (id: string)                          => api.get(`/transit/${id}`).then((r) => r.data.data),
-  cancelToday:       (id: string)                          => api.post(`/transit/${id}/cancel-today`).then((r) => r.data.data),
-  initSession:       (enrollmentId: string)                => api.post('/transit/init-session', { enrollmentId }).then((r) => r.data.data),
-  getDriverToday:    ()                                    => api.get('/transit/driver/today').then((r) => r.data.data),
-  updateDriverStatus:(id: string, status: string)          => api.patch(`/transit/${id}/driver-status`, { status }).then((r) => r.data.data),
-  updateLocation:    (id: string, lat: number, lng: number, etaMinutes?: number) =>
+  // User: today's TransitPassenger with nested session
+  getToday:              ()                                              => api.get('/transit/today').then((r) => r.data.data),
+  getById:               (id: string)                                   => api.get(`/transit/${id}`).then((r) => r.data.data),
+  cancelToday:           (id: string)                                   => api.post(`/transit/${id}/cancel-today`).then((r) => r.data.data),
+  // Driver
+  getDriverToday:        ()                                             => api.get('/transit/driver/today').then((r) => r.data.data),
+  updateDriverStatus:    (id: string, status: string)                   => api.patch(`/transit/${id}/driver-status`, { status }).then((r) => r.data.data),
+  updateLocation:        (id: string, lat: number, lng: number, etaMinutes?: number) =>
     api.patch(`/transit/${id}/driver-location`, { lat, lng, etaMinutes }).then((r) => r.data.data),
+  updatePassengerStatus: (sessionId: string, passengerId: string, status: string) =>
+    api.patch(`/transit/${sessionId}/passenger/${passengerId}/status`, { status }).then((r) => r.data.data),
+  // Admin / cron
+  generateToday:         ()                                             => api.post('/transit/generate-today').then((r) => r.data.data),
+  assignDriver:          (id: string, data: { driverUserId: string; driverName: string; driverPhone: string; vehicleNumber: string }) =>
+    api.post(`/transit/${id}/assign-driver`, data).then((r) => r.data.data),
 }
 
 export default api
