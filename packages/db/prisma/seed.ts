@@ -336,26 +336,98 @@ async function main() {
   console.log('✅ Created 31 slots')
 
   // ─── Drivers ─────────────────────────────────────────────────────────────
-  await Promise.all([
+  // Clean up old placeholder driver records before upserting real ones
+  await prisma.user.deleteMany({ where: { phone: { in: ['+917777777771', '+917777777772'] } } })
+  const [driver1, driver2] = await Promise.all([
     prisma.user.upsert({
-      where: { email: 'driver1@sportshub.com' },
-      update: {},
-      create: { name: 'Ramesh Kumar', email: 'driver1@sportshub.com', phone: '+917777777771', role: 'DRIVER' },
+      where: { email: 'tejareddy5022@gmail.com' },
+      update: { role: 'DRIVER', phone: '+917777777771' },
+      create: { name: 'Teja Reddy', email: 'tejareddy5022@gmail.com', phone: '+917777777771', role: 'DRIVER' },
     }),
     prisma.user.upsert({
-      where: { email: 'driver2@sportshub.com' },
-      update: {},
-      create: { name: 'Suresh Reddy', email: 'driver2@sportshub.com', phone: '+917777777772', role: 'DRIVER' },
+      where: { email: 'tejareddy2353@gmail.com' },
+      update: { role: 'DRIVER', phone: '+917777777772' },
+      create: { name: 'Teja Reddy 2', email: 'tejareddy2353@gmail.com', phone: '+917777777772', role: 'DRIVER' },
     }),
   ])
 
   console.log('✅ Created 2 drivers')
 
+  // ─── Test Enrollments + Today's Transit Sessions ─────────────────────────
+  const enrollment1 = await prisma.enrollment.upsert({
+    where: { id: 'enroll_test_1' },
+    update: {},
+    create: {
+      id: 'enroll_test_1',
+      userId: testUser.id,
+      slotId: 'slot_champ_j_m1',
+      status: 'CONFIRMED',
+      transportOpted: true,
+      pickupAddress: 'Banjara Hills, Hyderabad',
+      pickupLat: 17.4401,
+      pickupLng: 78.3489,
+      pickupDistance: 4.2,
+      durationMonths: 3,
+      startDate: new Date(),
+    },
+  })
+
+  const enrollment2 = await prisma.enrollment.upsert({
+    where: { id: 'enroll_test_2' },
+    update: {},
+    create: {
+      id: 'enroll_test_2',
+      userId: testUser.id,
+      slotId: 'slot_kick_u12_m1',
+      status: 'CONFIRMED',
+      transportOpted: true,
+      pickupAddress: 'Jubilee Hills, Hyderabad',
+      pickupLat: 17.4323,
+      pickupLng: 78.4070,
+      pickupDistance: 6.1,
+      durationMonths: 3,
+      startDate: new Date(),
+    },
+  })
+
+  const todayStart = new Date()
+  todayStart.setUTCHours(0, 0, 0, 0)
+
+  await prisma.transitSession.upsert({
+    where: { enrollmentId_date: { enrollmentId: enrollment1.id, date: todayStart } },
+    update: { driverUserId: driver1.id },
+    create: {
+      enrollmentId: enrollment1.id,
+      date: todayStart,
+      status: 'SCHEDULED',
+      driverUserId: driver1.id,
+      driverName: 'Teja Reddy',
+      driverPhone: '+917777777771',
+      vehicleNumber: 'TS09EA1234',
+    },
+  })
+
+  await prisma.transitSession.upsert({
+    where: { enrollmentId_date: { enrollmentId: enrollment2.id, date: todayStart } },
+    update: { driverUserId: driver2.id },
+    create: {
+      enrollmentId: enrollment2.id,
+      date: todayStart,
+      status: 'SCHEDULED',
+      driverUserId: driver2.id,
+      driverName: 'Teja Reddy 2',
+      driverPhone: '+917777777772',
+      vehicleNumber: 'TS10FB5678',
+    },
+  })
+
+  console.log('✅ Created test enrollments + today\'s transit sessions')
+
   console.log('\n🎉 Database seeded successfully!')
   console.log('\n📋 Test credentials:')
   console.log('   User:   user@sportshub.com / +919999999999')
   console.log('   Admin:  admin1@sportshub.com / +918888888881')
-  console.log('   Driver: driver1@sportshub.com / +917777777771')
+  console.log('   Driver: tejareddy5022@gmail.com / +917777777771')
   console.log('   OTP:    any 6 digits (dev mode)')
 }
 

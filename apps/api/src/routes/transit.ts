@@ -24,9 +24,9 @@ export default async function transitRoutes(fastify: FastifyInstance) {
   fastify.get('/today', { preHandler: requireAuth }, async (request, reply) => {
     const { id: userId } = request.user as { id: string }
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    today.setUTCHours(0, 0, 0, 0)
     const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
 
     const sessions = await prisma.transitSession.findMany({
       where: {
@@ -83,7 +83,7 @@ export default async function transitRoutes(fastify: FastifyInstance) {
     if (enrollment.userId !== userId) throw new ForbiddenError()
 
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    today.setUTCHours(0, 0, 0, 0)
 
     const session = await prisma.transitSession.upsert({
       where: { enrollmentId_date: { enrollmentId, date: today } },
@@ -98,7 +98,7 @@ export default async function transitRoutes(fastify: FastifyInstance) {
   fastify.post('/', async (request, reply) => {
     const body = createSessionSchema.parse(request.body)
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    today.setUTCHours(0, 0, 0, 0)
 
     const session = await prisma.transitSession.upsert({
       where: { enrollmentId_date: { enrollmentId: body.enrollmentId, date: today } },
@@ -140,9 +140,9 @@ export default async function transitRoutes(fastify: FastifyInstance) {
   fastify.get('/driver/today', { preHandler: requireAuth }, async (request, reply) => {
     const { id: driverUserId } = request.user as { id: string }
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    today.setUTCHours(0, 0, 0, 0)
     const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
 
     const sessions = await prisma.transitSession.findMany({
       where: { driverUserId, date: { gte: today, lt: tomorrow } },
