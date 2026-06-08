@@ -3,6 +3,7 @@ import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
   Animated, Alert,
 } from 'react-native'
+import { MotiView } from 'moti'
 import { Swipeable } from 'react-native-gesture-handler'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
@@ -107,7 +108,7 @@ export default function NotificationsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0D9488', '#1E3A5F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+      <LinearGradient colors={['#1AAFC9', '#1C2E4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Notifications</Text>
           <Text style={styles.headerSub}>
@@ -133,8 +134,14 @@ export default function NotificationsScreen({ navigation }: any) {
         keyExtractor={(n) => n.id}
         contentContainerStyle={{ padding: 16, gap: 10 }}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <NotifCard item={item} navigation={navigation} onDelete={removeNotification} />
+        renderItem={({ item, index }) => (
+          <MotiView
+            from={{ opacity: 0, translateX: -20 }}
+            animate={{ opacity: 1, translateX: 0 }}
+            transition={{ type: 'spring', delay: index * 55, damping: 18, stiffness: 160 }}
+          >
+            <NotifCard item={item} navigation={navigation} onDelete={removeNotification} />
+          </MotiView>
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -154,7 +161,7 @@ export default function NotificationsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container:     { flex: 1, backgroundColor: Colors.background },
-  header:        { paddingTop: 56, paddingBottom: 20, paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  header:        { paddingTop: 56, paddingBottom: 20, paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
   headerTitle:   { fontSize: FontSize['2xl'], fontWeight: FontWeight.extrabold, color: '#fff', letterSpacing: -0.5 },
   headerSub:     { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 3 },
   headerActions: { flexDirection: 'row', gap: 8, marginBottom: 4 },

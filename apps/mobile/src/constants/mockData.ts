@@ -7,10 +7,10 @@ export const MOCK_COACHES: Coach[] = [
 ]
 
 export const MOCK_SLOTS: Slot[] = [
-  { id: 'slot1', programId: 'prog1', timeStart: '06:30', timeEnd: '07:30', daysOfWeek: ['Monday', 'Wednesday', 'Friday'], totalCapacity: 20, enrolledCount: 12, isActive: true },
-  { id: 'slot2', programId: 'prog1', timeStart: '07:30', timeEnd: '08:30', daysOfWeek: ['Tuesday', 'Thursday', 'Saturday'], totalCapacity: 20, enrolledCount: 8, isActive: true },
-  { id: 'slot3', programId: 'prog1', timeStart: '17:00', timeEnd: '18:00', daysOfWeek: ['Monday', 'Wednesday', 'Friday'], totalCapacity: 20, enrolledCount: 18, isActive: true },
-  { id: 'slot4', programId: 'prog1', timeStart: '18:00', timeEnd: '19:00', daysOfWeek: ['Tuesday', 'Thursday', 'Saturday'], totalCapacity: 20, enrolledCount: 5, isActive: true },
+  { id: 'slot1', programId: 'prog1', timeStart: '06:30', timeEnd: '07:30', daysOfWeek: ['Monday', 'Wednesday', 'Friday'], totalCapacity: 20, enrolledCount: 12, transportCapacity: 10, isActive: true },
+  { id: 'slot2', programId: 'prog1', timeStart: '07:30', timeEnd: '08:30', daysOfWeek: ['Tuesday', 'Thursday', 'Saturday'], totalCapacity: 20, enrolledCount: 8, transportCapacity: 10, isActive: true },
+  { id: 'slot3', programId: 'prog1', timeStart: '17:00', timeEnd: '18:00', daysOfWeek: ['Monday', 'Wednesday', 'Friday'], totalCapacity: 20, enrolledCount: 18, transportCapacity: 10, isActive: true },
+  { id: 'slot4', programId: 'prog1', timeStart: '18:00', timeEnd: '19:00', daysOfWeek: ['Tuesday', 'Thursday', 'Saturday'], totalCapacity: 20, enrolledCount: 5, transportCapacity: 10, isActive: true },
 ]
 
 export const MOCK_ACADEMIES: Academy[] = [

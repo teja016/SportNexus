@@ -21,3 +21,6 @@ coverage/
 .DS_Store
 Thumbs.db
 prisma/migrations/
+
+# Office temporary lock files
+~$*

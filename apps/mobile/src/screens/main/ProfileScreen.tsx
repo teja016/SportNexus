@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, Modal, StyleSheet, Platform, Image } from 'react-native'
+import { MotiView } from 'moti'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useQuery } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -43,7 +44,7 @@ export default function ProfileScreen({ navigation }: any) {
   })
 
   const { data: enrollmentsData } = useQuery({
-    queryKey: ['my-enrollments'],
+    queryKey: ['my-enrollments', user?.id],
     queryFn:  () => {
       const { enrollmentAPI } = require('../../services/api')
       return enrollmentAPI.getMyEnrollments()
@@ -52,8 +53,9 @@ export default function ProfileScreen({ navigation }: any) {
     retry: 1,
   })
 
-  const profile  = data ?? user
-  const initials = profile?.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() ?? '?'
+  const profile      = data ?? user
+  const displayPhoto = user?.profilePhoto ?? profile?.profilePhoto ?? null
+  const initials     = profile?.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() ?? '?'
 
   const allEnrollments: any[] = enrollmentsData ?? localEnrollments
   const total    = allEnrollments.length || localEnrollments.length
@@ -81,8 +83,9 @@ export default function ProfileScreen({ navigation }: any) {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
 
         {/* ── Compact gradient header strip ─────────────────── */}
+        <MotiView from={{ opacity: 0, translateY: -20 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', damping: 18, stiffness: 160 }}>
         <LinearGradient
-          colors={['#0D9488', '#1E3A5F']}
+          colors={['#1AAFC9', '#1C2E4A']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.header}
@@ -90,8 +93,8 @@ export default function ProfileScreen({ navigation }: any) {
           <View style={styles.headerRow}>
             {/* Avatar */}
             <TouchableOpacity style={styles.avatarWrap} onPress={() => navigation.navigate('EditProfile')} activeOpacity={0.85}>
-              {profile?.profilePhoto ? (
-                <Image source={{ uri: profile.profilePhoto }} style={styles.avatarImg} />
+              {displayPhoto ? (
+                <Image source={{ uri: displayPhoto }} style={styles.avatarImg} />
               ) : (
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{initials}</Text>
@@ -120,33 +123,13 @@ export default function ProfileScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
         </LinearGradient>
-
-        {/* ── Stats row card ────────────────────────────────── */}
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{total}</Text>
-            <Text style={styles.statLabel}>Enrollments</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: Colors.accent }]}>{active}</Text>
-            <Text style={styles.statLabel}>Active</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: Colors.purple }]}>{academies}</Text>
-            <Text style={styles.statLabel}>Academies</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#EF4444' }]}>{favorites.length}</Text>
-            <Text style={styles.statLabel}>Saved</Text>
-          </View>
-        </View>
+        </MotiView>
 
         {/* ── Menu Sections ────────────────────────────────── */}
+        <MotiView from={{ opacity: 0, translateY: 32 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', delay: 120, damping: 18, stiffness: 150 }}>
         <View style={styles.menuArea}>
-          {MENU_SECTIONS.map((section) => (
+          {/* Account section comes first */}
+          {MENU_SECTIONS.filter(s => s.title === 'Account').map((section) => (
             <View key={section.title} style={styles.section}>
               <Text style={styles.sectionTitle}>{section.title}</Text>
               <View style={styles.menuCard}>
@@ -174,6 +157,98 @@ export default function ProfileScreen({ navigation }: any) {
                       size={15}
                       color={item.enabled ? Colors.textMuted : Colors.border}
                     />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ))}
+
+          {/* ── My Activity section ──────────────────────────── */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>My Activity</Text>
+            <View style={styles.menuCard}>
+              <TouchableOpacity
+                style={[styles.menuItem, styles.menuItemBorder]}
+                onPress={() => navigation.navigate('Enrollments')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.menuIcon, { backgroundColor: Colors.tealXLight }]}>
+                  <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuLabel}>Total Enrollments</Text>
+                  <Text style={styles.menuSub}>All your bookings</Text>
+                </View>
+                <Text style={styles.activityValue}>{total}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.menuItem, styles.menuItemBorder]}
+                onPress={() => navigation.navigate('Enrollments')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.menuIcon, { backgroundColor: '#D1FAE5' }]}>
+                  <Ionicons name="fitness-outline" size={18} color={Colors.accent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuLabel}>Active Sessions</Text>
+                  <Text style={styles.menuSub}>Currently enrolled</Text>
+                </View>
+                <Text style={[styles.activityValue, { color: Colors.accent }]}>{active}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.menuItem, styles.menuItemBorder]}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.menuIcon, { backgroundColor: '#EDE9FE' }]}>
+                  <Ionicons name="school-outline" size={18} color={Colors.purple} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuLabel}>Academies Joined</Text>
+                  <Text style={styles.menuSub}>Unique academies visited</Text>
+                </View>
+                <Text style={[styles.activityValue, { color: Colors.purple }]}>{academies}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.menuIcon, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="heart-outline" size={18} color="#EF4444" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuLabel}>Saved Academies</Text>
+                  <Text style={styles.menuSub}>Your wishlist</Text>
+                </View>
+                <Text style={[styles.activityValue, { color: '#EF4444' }]}>{favorites.length}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* ── Support section ──────────────────────────────── */}
+          {MENU_SECTIONS.filter(s => s.title === 'Support').map((section) => (
+            <View key={section.title} style={styles.section}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <View style={styles.menuCard}>
+                {section.items.map((item, idx) => (
+                  <TouchableOpacity
+                    key={item.label}
+                    style={[styles.menuItem, idx < section.items.length - 1 && styles.menuItemBorder]}
+                    onPress={() => item.screen ? navigation.navigate(item.screen) : null}
+                    activeOpacity={item.enabled ? 0.7 : 1}
+                  >
+                    <View style={[styles.menuIcon, !item.enabled && styles.menuIconDim]}>
+                      <Ionicons name={item.icon} size={18} color={item.enabled ? Colors.primary : Colors.textMuted} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.menuLabel, !item.enabled && styles.menuLabelDim]}>{item.label}</Text>
+                      <Text style={styles.menuSub}>{item.sub}</Text>
+                    </View>
+                    {!item.enabled && (
+                      <View style={styles.comingSoonBadge}>
+                        <Text style={styles.comingSoonText}>Soon</Text>
+                      </View>
+                    )}
+                    <Ionicons name="chevron-forward" size={15} color={item.enabled ? Colors.textMuted : Colors.border} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -236,6 +311,7 @@ export default function ProfileScreen({ navigation }: any) {
 
           <Text style={styles.version}>SportNexus v2.0.0</Text>
         </View>
+        </MotiView>
       </ScrollView>
 
       {/* ── Web confirm dialog ───────────────────────────── */}
@@ -268,7 +344,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
 
   /* ── Compact Header ── */
-  header: { paddingTop: 52, paddingBottom: 24, paddingHorizontal: 20 },
+  header: { paddingTop: 52, paddingBottom: 24, paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
 
   avatarWrap:  { position: 'relative' },
@@ -306,20 +382,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  /* ── Stats Card ── */
-  statsCard: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    marginHorizontal: 16,
-    marginTop: -1,
-    borderRadius: BorderRadius.xl,
-    ...Shadow.sm,
-    paddingVertical: 4,
-  },
-  statItem:    { flex: 1, alignItems: 'center', paddingVertical: 14 },
-  statValue:   { fontSize: FontSize.xl, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
-  statLabel:   { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2, fontWeight: FontWeight.medium },
-  statDivider: { width: 1, backgroundColor: Colors.borderLight, marginVertical: 10 },
+  activityValue: { fontSize: FontSize.lg, fontWeight: FontWeight.extrabold, color: Colors.textPrimary, minWidth: 28, textAlign: 'right' },
 
   /* ── Menu ── */
   menuArea:      { paddingHorizontal: 16, marginTop: 20 },

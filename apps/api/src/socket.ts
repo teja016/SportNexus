@@ -103,14 +103,24 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
           try {
             const session = await prisma.transitSession.findUnique({
               where: { id: sessionId },
-              include: { enrollment: { include: { user: { select: { id: true, fcmToken: true } } } } },
+              include: {
+                passengers: {
+                  include: {
+                    enrollment: { include: { user: { select: { id: true, fcmToken: true } } } },
+                  },
+                },
+              },
             })
-            if (session?.enrollment.user.fcmToken) {
-              await notificationQueue.add(notifType, {
-                userId:    session.enrollment.userId,
-                type:      notifType,
-                sessionId,
-              })
+            if (session) {
+              for (const passenger of session.passengers) {
+                if (passenger.enrollment.user.fcmToken) {
+                  await notificationQueue.add(notifType, {
+                    userId:    passenger.enrollment.userId,
+                    type:      notifType,
+                    sessionId,
+                  })
+                }
+              }
             }
           } catch { /* non-fatal */ }
         }

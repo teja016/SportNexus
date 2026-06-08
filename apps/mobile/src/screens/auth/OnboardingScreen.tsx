@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Dimensions } from 'react-native'
+import { MotiView } from 'moti'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuthStore } from '../../store/authStore'
@@ -16,8 +17,8 @@ const SLIDES = [
     subtitle: 'Discover top-rated sports academies near you with verified coaches and world-class facilities.',
     bg: Colors.navy,
     accent: Colors.primary,
-    glow: '#0D9488',
-    bubbles: ['#0D9488', '#14B8A6', '#0A7A6B'],
+    glow: '#1AAFC9',
+    bubbles: ['#1AAFC9', '#29C5DA', '#1592AA'],
   },
   {
     id: '2',
@@ -96,7 +97,12 @@ export default function OnboardingScreen({ navigation }: any) {
               )
             })}
 
-            <View style={styles.iconArea}>
+            <MotiView
+              from={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', damping: 14, stiffness: 140 }}
+              style={styles.iconArea}
+            >
               <View style={[styles.glowRing, { borderColor: item.glow + '28' }]} />
               <View style={[styles.glowRing, styles.glowRing2, { borderColor: item.glow + '16' }]} />
               <LinearGradient
@@ -105,10 +111,14 @@ export default function OnboardingScreen({ navigation }: any) {
               >
                 <Text style={{ fontSize: 52 }}>{item.emoji}</Text>
               </LinearGradient>
-            </View>
+            </MotiView>
 
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.subtitle}>{item.subtitle}</Text>
+            <MotiView from={{ opacity: 0, translateY: 24 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', delay: 150, damping: 18, stiffness: 150 }}>
+              <Text style={styles.title}>{item.title}</Text>
+            </MotiView>
+            <MotiView from={{ opacity: 0, translateY: 20 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', delay: 260, duration: 400 }}>
+              <Text style={styles.subtitle}>{item.subtitle}</Text>
+            </MotiView>
           </View>
         )}
       />

@@ -51,9 +51,8 @@ export default async function userRoutes(fastify: FastifyInstance) {
           },
         },
         payment: true,
-        transitSessions: {
-          orderBy: { date: 'desc' },
-          take: 1,
+        transitPassenger: {
+          include: { session: true },
         },
       },
       orderBy: { enrolledAt: 'desc' },

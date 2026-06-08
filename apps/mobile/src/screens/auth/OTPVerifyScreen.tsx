@@ -1,5 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Animated } from 'react-native'
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ActivityIndicator, Animated, KeyboardAvoidingView, Platform, StatusBar,
+} from 'react-native'
+import { MotiView } from 'moti'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { authAPI } from '../../services/api'
@@ -7,57 +11,32 @@ import { useAuthStore } from '../../store/authStore'
 import { Colors, FontSize, FontWeight, BorderRadius } from '../../constants/theme'
 
 export default function OTPVerifyScreen({ route, navigation }: any) {
-  const phone  = route.params?.phone ?? ''
-  const email  = route.params?.email ?? null
-  const flow   = route.params?.flow ?? 'register'
+  const phone = route.params?.phone ?? ''
+  const email = route.params?.email ?? null
+  const flow  = route.params?.flow ?? 'register'
+
   const [otp, setOtp]         = useState(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
   const [userNotFound, setUserNotFound] = useState(false)
-  const [countdown, setCountdown] = useState(30)
+  const [countdown, setCountdown]       = useState(30)
   const inputRefs = useRef<Array<TextInput | null>>([])
   const { login } = useAuthStore()
 
-  const ring1Scale   = useRef(new Animated.Value(1)).current
-  const ring1Opacity = useRef(new Animated.Value(0.4)).current
-  const ring2Scale   = useRef(new Animated.Value(1)).current
-  const ring2Opacity = useRef(new Animated.Value(0.25)).current
-  const slideUp      = useRef(new Animated.Value(30)).current
-  const fadeIn       = useRef(new Animated.Value(0)).current
-
+  const pulseAnim = useRef(new Animated.Value(1)).current
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(slideUp, { toValue: 0, tension: 60, friction: 7, useNativeDriver: true }),
-      Animated.timing(fadeIn,  { toValue: 1, duration: 500, useNativeDriver: true }),
-    ]).start()
-
-    Animated.loop(Animated.sequence([
-      Animated.parallel([
-        Animated.timing(ring1Scale,   { toValue: 1.6, duration: 1200, useNativeDriver: true }),
-        Animated.timing(ring1Opacity, { toValue: 0,   duration: 1200, useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.timing(ring1Scale,   { toValue: 1, duration: 0, useNativeDriver: true }),
-        Animated.timing(ring1Opacity, { toValue: 0.4, duration: 0, useNativeDriver: true }),
-      ]),
-    ])).start()
-    Animated.loop(Animated.sequence([
-      Animated.delay(400),
-      Animated.parallel([
-        Animated.timing(ring2Scale,   { toValue: 1.6, duration: 1200, useNativeDriver: true }),
-        Animated.timing(ring2Opacity, { toValue: 0,   duration: 1200, useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.timing(ring2Scale,   { toValue: 1, duration: 0, useNativeDriver: true }),
-        Animated.timing(ring2Opacity, { toValue: 0.25, duration: 0, useNativeDriver: true }),
-      ]),
-    ])).start()
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.15, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 900, useNativeDriver: true }),
+      ])
+    ).start()
   }, [])
 
   useEffect(() => {
     if (countdown <= 0) return
-    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000)
-    return () => clearTimeout(timer)
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
   }, [countdown])
 
   async function handleVerify(code?: string[]) {
@@ -75,158 +54,190 @@ export default function OTPVerifyScreen({ route, navigation }: any) {
         login(mockUser, `dev-${Date.now()}`, 'dev-refresh')
       } else {
         const msg = err.response?.data?.error?.message ?? ''
-        const isUserNotFound = msg.toLowerCase().includes('not found') || err.response?.status === 404
-        if (isUserNotFound) {
+        const isNotFound = msg.toLowerCase().includes('not found') || err.response?.status === 404
+        if (isNotFound) {
           setUserNotFound(true)
-          setError(flow === 'login'
-            ? 'No account found for this number. Would you like to create one?'
-            : 'Registration may have failed. Please go back and try again.')
+          setError(flow === 'login' ? 'No account found for this number.' : 'Registration may have failed. Go back and retry.')
         } else {
           setError(msg || 'Verification failed. Please try again.')
         }
       }
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   function handleChange(value: string, index: number) {
-    const newOtp = [...otp]
-    newOtp[index] = value.slice(-1)
-    setOtp(newOtp)
+    const next = [...otp]
+    next[index] = value.slice(-1)
+    setOtp(next)
+    setError('')
     if (value && index < 5) inputRefs.current[index + 1]?.focus()
-    if (newOtp.every((d) => d !== '')) handleVerify(newOtp)
+    if (next.every((d) => d !== '')) handleVerify(next)
   }
 
   function handleKeyPress(key: string, index: number) {
-    if (key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus()
-    }
+    if (key === 'Backspace' && !otp[index] && index > 0) inputRefs.current[index - 1]?.focus()
   }
 
   const filled = otp.filter((d) => d !== '').length
+  const masked = phone.replace(/(\+91)(\d{3})\d{4}(\d{3})/, '$1 $2 •••• $3')
 
   return (
-    <LinearGradient colors={['#0F172A', '#1E3A5F', '#0D2137']} style={styles.container}>
-      <Animated.View style={[styles.content, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient colors={['#0D1B2A', '#1C2E4A', '#1AAFC9']} start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 1 }} style={StyleSheet.absoluteFill} />
+      <View style={styles.circle1} />
 
-        {/* Back */}
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={20} color="rgba(255,255,255,0.7)" />
-        </TouchableOpacity>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.kav}>
 
-        {/* Icon with rings */}
-        <View style={styles.iconArea}>
-          <Animated.View style={[styles.ring, { transform: [{ scale: ring1Scale }], opacity: ring1Opacity }]} />
-          <Animated.View style={[styles.ring, styles.ring2, { transform: [{ scale: ring2Scale }], opacity: ring2Opacity }]} />
-          <LinearGradient colors={[Colors.primary, '#0A6E65']} style={styles.iconCircle}>
-            <Text style={{ fontSize: 38 }}>🔐</Text>
-          </LinearGradient>
-        </View>
+        {/* Header */}
+        <MotiView from={{ opacity: 0, translateY: -20 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', damping: 18, stiffness: 140 }} style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={20} color="rgba(255,255,255,0.85)" />
+          </TouchableOpacity>
 
-        <Text style={styles.heading}>Verify OTP</Text>
-        <Text style={styles.sub}>
-          {email
-            ? `Code sent to\n${email}`
-            : `Enter the 6-digit code sent to\n${phone}`
-          }
-        </Text>
-
-        {/* OTP boxes */}
-        <View style={styles.otpRow}>
-          {otp.map((digit, i) => (
-            <TextInput
-              key={i}
-              ref={(r) => { inputRefs.current[i] = r }}
-              style={[styles.otpBox, digit ? styles.otpBoxFilled : null, loading && styles.otpBoxLoading]}
-              value={digit}
-              onChangeText={(v) => handleChange(v, i)}
-              onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
-              keyboardType="numeric"
-              maxLength={1}
-              autoFocus={i === 0}
-              editable={!loading}
-            />
-          ))}
-        </View>
-
-        {/* Progress bar */}
-        <View style={styles.progressBg}>
-          <Animated.View style={[styles.progressFill, { width: `${(filled / 6) * 100}%` }]} />
-        </View>
-
-        {!!error && (
-          <View style={styles.errorBox}>
-            <Ionicons name="alert-circle-outline" size={15} color="#FCA5A5" />
-            <Text style={styles.errorText}>{error}</Text>
+          {/* Animated shield icon */}
+          <View style={styles.iconWrap}>
+            <Animated.View style={[styles.iconRing, { transform: [{ scale: pulseAnim }] }]} />
+            <View style={styles.iconCircle}>
+              <Ionicons name="shield-checkmark" size={32} color="#fff" />
+            </View>
           </View>
-        )}
 
-        {userNotFound && flow === 'login' && (
-          <TouchableOpacity style={styles.altBtn} onPress={() => navigation.replace('Register')}>
-            <Ionicons name="person-add-outline" size={16} color={Colors.primary} />
-            <Text style={styles.altBtnText}>Create a new account</Text>
-          </TouchableOpacity>
-        )}
-        {userNotFound && flow === 'register' && (
-          <TouchableOpacity style={[styles.altBtn, { borderColor: 'rgba(255,255,255,0.15)' }]} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back-outline" size={16} color="rgba(255,255,255,0.6)" />
-            <Text style={[styles.altBtnText, { color: 'rgba(255,255,255,0.6)' }]}>Go back and try again</Text>
-          </TouchableOpacity>
-        )}
+          <Text style={styles.title}>Verify Your Number</Text>
+          <Text style={styles.subtitle}>
+            {email ? `Code sent to ${email}` : `6-digit code sent to ${masked}`}
+          </Text>
+        </MotiView>
 
-        {!userNotFound && (
-          <TouchableOpacity style={styles.btn} onPress={() => handleVerify()} disabled={loading} activeOpacity={0.88}>
-            <LinearGradient colors={[Colors.primary, '#0A6E65']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btnGrad}>
-              {loading ? <ActivityIndicator color="#fff" /> : (
-                <><Text style={styles.btnText}>Verify OTP</Text><Ionicons name="checkmark-circle" size={18} color="#fff" /></>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
+        {/* OTP card */}
+        <MotiView from={{ opacity: 0, translateY: 40 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', delay: 150, damping: 18, stiffness: 140 }} style={styles.card}>
 
-        {countdown > 0 ? (
-          <View style={styles.countdownRow}>
-            <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.4)" />
-            <Text style={styles.countdown}>Resend in {countdown}s</Text>
+          {/* OTP boxes */}
+          <View style={styles.otpRow}>
+            {otp.map((digit, i) => (
+              <MotiView
+                key={i}
+                from={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: 'spring', delay: 200 + i * 50, damping: 14, stiffness: 180 }}
+                style={styles.otpCellWrap}
+              >
+                <TextInput
+                  ref={(r) => { inputRefs.current[i] = r }}
+                  style={[styles.otpBox, !!digit && styles.otpBoxFilled, loading && styles.otpBoxLoading]}
+                  value={digit}
+                  onChangeText={(v) => handleChange(v, i)}
+                  onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
+                  keyboardType="numeric"
+                  maxLength={1}
+                  autoFocus={i === 0}
+                  editable={!loading}
+                  selectTextOnFocus
+                />
+              </MotiView>
+            ))}
           </View>
-        ) : (
-          <TouchableOpacity onPress={async () => {
-            setCountdown(30); setOtp(['', '', '', '', '', '']); setUserNotFound(false); setError('')
-            try { await authAPI.sendOTP(phone) } catch {}
-          }}>
-            <Text style={styles.resend}>Resend OTP</Text>
-          </TouchableOpacity>
-        )}
-      </Animated.View>
-    </LinearGradient>
+
+          {/* Progress dots */}
+          <View style={styles.progressRow}>
+            {otp.map((d, i) => (
+              <View key={i} style={[styles.dot, !!d && styles.dotFilled]} />
+            ))}
+          </View>
+
+          {!!error && (
+            <View style={styles.errorBox}>
+              <Ionicons name="alert-circle" size={15} color="#DC2626" />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          {userNotFound && flow === 'login' && (
+            <TouchableOpacity style={styles.altBtn} onPress={() => navigation.replace('Register')}>
+              <Ionicons name="person-add-outline" size={16} color={Colors.primary} />
+              <Text style={styles.altBtnText}>Create a new account</Text>
+            </TouchableOpacity>
+          )}
+          {userNotFound && flow === 'register' && (
+            <TouchableOpacity style={styles.altBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back-outline" size={16} color="#9CA3AF" />
+              <Text style={[styles.altBtnText, { color: '#9CA3AF' }]}>Go back and retry</Text>
+            </TouchableOpacity>
+          )}
+
+          {!userNotFound && (
+            <TouchableOpacity style={styles.btn} onPress={() => handleVerify()} disabled={loading || filled < 6} activeOpacity={0.88}>
+              <LinearGradient
+                colors={filled === 6 ? ['#1AAFC9', '#0E8FA8'] : ['#D1D5DB', '#D1D5DB']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.btnGrad}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <><Text style={[styles.btnText, filled < 6 && { color: '#9CA3AF' }]}>Verify Code</Text><Ionicons name="checkmark-circle" size={18} color={filled === 6 ? '#fff' : '#9CA3AF'} /></>
+                }
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+
+          {countdown > 0 ? (
+            <View style={styles.countdownRow}>
+              <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+              <Text style={styles.countdownText}>Resend code in {countdown}s</Text>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={async () => {
+              setCountdown(30); setOtp(['', '', '', '', '', '']); setUserNotFound(false); setError('')
+              try { await authAPI.sendOTP(phone) } catch {}
+            }} style={styles.countdownRow}>
+              <Ionicons name="refresh-outline" size={14} color={Colors.primary} />
+              <Text style={styles.resendText}>Resend OTP</Text>
+            </TouchableOpacity>
+          )}
+        </MotiView>
+
+      </KeyboardAvoidingView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1 },
-  content:      { flex: 1, padding: 24, paddingTop: 56, alignItems: 'center', gap: 20 },
-  backBtn:      { alignSelf: 'flex-start', width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  iconArea:     { alignItems: 'center', justifyContent: 'center', height: 120, width: 120, marginVertical: 8 },
-  ring:         { position: 'absolute', width: 96, height: 96, borderRadius: 48, borderWidth: 2, borderColor: Colors.primary },
-  ring2:        { width: 120, height: 120, borderRadius: 60, borderColor: 'rgba(13,148,136,0.5)' },
-  iconCircle:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.5, shadowRadius: 24, elevation: 16 },
-  heading:      { fontSize: FontSize['2xl'], fontWeight: FontWeight.black, color: '#fff', letterSpacing: -0.5 },
-  sub:          { fontSize: FontSize.base, color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 24, marginTop: -8 },
-  otpRow:       { flexDirection: 'row', gap: 12 },
-  otpBox:       { width: 48, height: 60, borderRadius: BorderRadius.md, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)', textAlign: 'center', fontSize: FontSize['2xl'], fontWeight: FontWeight.black, color: '#fff', backgroundColor: 'rgba(255,255,255,0.07)' },
-  otpBoxFilled: { borderColor: Colors.primary, backgroundColor: 'rgba(13,148,136,0.2)', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
-  otpBoxLoading:{ opacity: 0.6 },
-  progressBg:   { width: '100%', height: 3, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2 },
-  progressFill: { height: 3, backgroundColor: Colors.primary, borderRadius: 2 },
-  errorBox:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(239,68,68,0.15)', borderRadius: BorderRadius.md, padding: 12, width: '100%', borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)' },
-  errorText:    { flex: 1, fontSize: FontSize.sm, color: '#FCA5A5', lineHeight: 20 },
-  altBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: BorderRadius.md, padding: 14, borderWidth: 1, borderColor: 'rgba(13,148,136,0.4)', width: '100%' },
-  altBtnText:   { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.primary },
-  btn:          { width: '100%', borderRadius: BorderRadius.lg, overflow: 'hidden', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 12 },
-  btnGrad:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
-  btnText:      { color: '#fff', fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  root:    { flex: 1 },
+  circle1: { position: 'absolute', top: -80, right: -50, width: 260, height: 260, borderRadius: 130, backgroundColor: 'rgba(26,175,201,0.08)' },
+  kav:     { flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 24 },
+
+  header:   { alignItems: 'center', gap: 10 },
+  backBtn:  { alignSelf: 'flex-start', width: 42, height: 42, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  iconWrap: { alignItems: 'center', justifyContent: 'center', width: 80, height: 80, marginBottom: 4 },
+  iconRing: { position: 'absolute', width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
+  iconCircle: { width: 60, height: 60, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)' },
+  title:    { fontSize: 28, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -0.8 },
+  subtitle: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.55)', textAlign: 'center', paddingHorizontal: 20 },
+
+  card:    { backgroundColor: '#fff', borderRadius: 24, padding: 24, gap: 18, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.15, shadowRadius: 40, elevation: 20 },
+
+  otpRow:     { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  otpCellWrap:{ flex: 1 },
+  otpBox:     { height: 62, borderRadius: 14, borderWidth: 2, borderColor: '#E5E7EB', textAlign: 'center', fontSize: FontSize['2xl'], fontWeight: FontWeight.black, color: '#111827', backgroundColor: '#F9FAFB' },
+  otpBoxFilled:  { borderColor: Colors.primary, backgroundColor: '#F0FDFA', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+  otpBoxLoading: { opacity: 0.5 },
+
+  progressRow: { flexDirection: 'row', gap: 8 },
+  dot:         { width: 8, height: 8, borderRadius: 4, backgroundColor: '#E5E7EB' },
+  dotFilled:   { backgroundColor: Colors.primary, width: 20 },
+
+  errorBox:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#FECACA', width: '100%' },
+  errorText: { flex: 1, fontSize: FontSize.sm, color: '#DC2626' },
+
+  altBtn:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F9FAFB', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#E5E7EB', width: '100%' },
+  altBtnText:{ fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.primary },
+
+  btn:     { width: '100%', borderRadius: 16, overflow: 'hidden', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10 },
+  btnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 17 },
+  btnText: { color: '#fff', fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+
   countdownRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  countdown:    { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.4)' },
-  resend:       { fontSize: FontSize.base, color: Colors.primary, fontWeight: FontWeight.bold },
+  countdownText:{ fontSize: FontSize.sm, color: '#9CA3AF' },
+  resendText:   { fontSize: FontSize.base, color: Colors.primary, fontWeight: FontWeight.bold },
 })

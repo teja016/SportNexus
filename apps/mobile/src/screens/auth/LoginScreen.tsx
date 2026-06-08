@@ -1,19 +1,22 @@
 import React, { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ActivityIndicator, KeyboardAvoidingView, Platform, StatusBar,
+} from 'react-native'
+import { MotiView } from 'moti'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { authAPI } from '../../services/api'
-import { Colors, FontSize, FontWeight, BorderRadius, Shadow } from '../../constants/theme'
+import { Colors, FontSize, FontWeight, BorderRadius } from '../../constants/theme'
 
 export default function LoginScreen({ navigation }: any) {
   const [phone, setPhone]     = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
+
   async function handleLogin() {
     const cleaned = phone.replace(/\D/g, '')
-    if (cleaned.length < 10) {
-      setError('Please enter a valid 10-digit phone number.')
-      return
-    }
+    if (cleaned.length < 10) { setError('Enter a valid 10-digit phone number.'); return }
     setError('')
     setLoading(true)
     const fullPhone = `+91${cleaned.slice(-10)}`
@@ -21,8 +24,7 @@ export default function LoginScreen({ navigation }: any) {
       const res = await authAPI.login({ phone: fullPhone })
       navigation.navigate('OTPVerify', { phone: fullPhone, email: res?.email ?? null, flow: 'login' })
     } catch (err: any) {
-      const isNetworkError = !err.response
-      if (isNetworkError) {
+      if (!err.response) {
         navigation.navigate('OTPVerify', { phone: fullPhone, flow: 'login' })
       } else {
         const msg = err.response?.data?.error?.message ?? ''
@@ -32,134 +34,116 @@ export default function LoginScreen({ navigation }: any) {
           setError(msg || 'Login failed. Please try again.')
         }
       }
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      {/* Back button */}
-      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
-      </TouchableOpacity>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient colors={['#0D1B2A', '#1C2E4A', '#1AAFC9']} start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 1 }} style={StyleSheet.absoluteFill} />
+      <View style={styles.circle1} />
+      <View style={styles.circle2} />
 
-      <View style={styles.iconWrap}>
-        <Ionicons name="log-in-outline" size={36} color={Colors.primary} />
-      </View>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.kav}>
 
-      <Text style={styles.heading}>Welcome Back</Text>
-      <Text style={styles.sub}>Enter your registered phone number to receive a verification code</Text>
-
-      <View style={styles.form}>
-        <Text style={styles.label}>Phone Number</Text>
-        <View style={styles.phoneRow}>
-          <View style={styles.prefix}>
-            <Text style={styles.prefixText}>+91</Text>
-          </View>
-          <TextInput
-            style={styles.phoneInput}
-            placeholder="9876543210"
-            placeholderTextColor={Colors.textMuted}
-            value={phone}
-            onChangeText={(t) => setPhone(t.replace(/\D/g, '').slice(0, 10))}
-            keyboardType="phone-pad"
-            maxLength={10}
-            autoFocus
-          />
-        </View>
-
-        {!!error && (
-          <View style={styles.errorBox}>
-            <Ionicons name="alert-circle-outline" size={16} color={Colors.danger} />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        {/* No account? suggestion */}
-        {error.includes('No account') && (
-          <TouchableOpacity style={styles.createAccountBtn} onPress={() => navigation.replace('Register')}>
-            <Ionicons name="person-add-outline" size={16} color={Colors.primary} />
-            <Text style={styles.createAccountText}>Create a new account instead</Text>
+        {/* Header */}
+        <MotiView from={{ opacity: 0, translateY: -20 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', damping: 18, stiffness: 140 }} style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={20} color="rgba(255,255,255,0.85)" />
           </TouchableOpacity>
-        )}
+          <View style={styles.brandRow}>
+            <View style={styles.brandDot} />
+            <Text style={styles.brandName}>SportNexus</Text>
+          </View>
+          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.subtitle}>Sign in with your phone number</Text>
+        </MotiView>
 
-        <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading}>
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : (
-              <View style={styles.btnInner}>
-                <Text style={styles.btnText}>Send OTP</Text>
-                <Ionicons name="arrow-forward" size={18} color="#fff" />
-              </View>
-            )}
-        </TouchableOpacity>
+        {/* Form card */}
+        <MotiView from={{ opacity: 0, translateY: 40 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', delay: 150, damping: 18, stiffness: 140 }} style={styles.card}>
+          <Text style={styles.fieldLabel}>Phone Number</Text>
+          <View style={styles.phoneRow}>
+            <View style={styles.prefix}>
+              <Text style={styles.prefixText}>🇮🇳 +91</Text>
+            </View>
+            <TextInput
+              style={styles.phoneInput}
+              placeholder="98765 43210"
+              placeholderTextColor="#9CA3AF"
+              value={phone}
+              onChangeText={(t) => { setPhone(t.replace(/\D/g, '').slice(0, 10)); setError('') }}
+              keyboardType="phone-pad"
+              maxLength={10}
+              autoFocus
+            />
+          </View>
 
-        <TouchableOpacity style={styles.switchBtn} onPress={() => navigation.replace('Register')}>
-          <Text style={styles.switchText}>Don't have an account? </Text>
-          <Text style={styles.switchLink}>Sign Up</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          {!!error && (
+            <View style={styles.errorBox}>
+              <Ionicons name="alert-circle" size={15} color="#EF4444" />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          {error.includes('No account') && (
+            <TouchableOpacity style={styles.altAction} onPress={() => navigation.replace('Register')}>
+              <Text style={styles.altActionText}>Create a new account instead →</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading} activeOpacity={0.88}>
+            <LinearGradient colors={['#1AAFC9', '#0E8FA8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btnGrad}>
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <><Text style={styles.btnText}>Send OTP</Text><Ionicons name="arrow-forward" size={18} color="#fff" /></>
+              }
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.switchRow} onPress={() => navigation.replace('Register')}>
+            <Text style={styles.switchText}>Don't have an account? </Text>
+            <Text style={styles.switchLink}>Sign Up</Text>
+          </TouchableOpacity>
+        </MotiView>
+
+      </KeyboardAvoidingView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: Colors.background, padding: 24, paddingTop: 60 },
+  root:     { flex: 1 },
+  circle1:  { position: 'absolute', top: -80, right: -50, width: 260, height: 260, borderRadius: 130, backgroundColor: 'rgba(26,175,201,0.08)' },
+  circle2:  { position: 'absolute', bottom: 100, left: -70, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.03)' },
+  kav:      { flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 24 },
 
-  backBtn: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: Colors.border, marginBottom: 32,
-    ...Shadow.xs,
-  },
+  header:   { gap: 8 },
+  backBtn:  { width: 42, height: 42, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  brandDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary },
+  brandName:{ fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: 'rgba(255,255,255,0.5)', letterSpacing: 1.5, textTransform: 'uppercase' },
+  title:    { fontSize: 32, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -1 },
+  subtitle: { fontSize: FontSize.base, color: 'rgba(255,255,255,0.55)' },
 
-  iconWrap: {
-    width: 72, height: 72, borderRadius: 22,
-    backgroundColor: Colors.tealXLight,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 20,
-    ...Shadow.sm,
-  },
+  card:     { backgroundColor: '#fff', borderRadius: 24, padding: 24, gap: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.15, shadowRadius: 40, elevation: 20 },
+  fieldLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.8 },
 
-  heading: { fontSize: FontSize['2xl'], fontWeight: FontWeight.extrabold, color: Colors.textPrimary, letterSpacing: -0.5 },
-  sub:     { fontSize: FontSize.base, color: Colors.textSecondary, marginTop: 8, marginBottom: 36, lineHeight: 22 },
+  phoneRow:   { flexDirection: 'row', gap: 10 },
+  prefix:     { backgroundColor: '#F9FAFB', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 14, justifyContent: 'center' },
+  prefixText: { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: '#374151' },
+  phoneInput: { flex: 1, backgroundColor: '#F9FAFB', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: '#111827' },
 
-  form:    { gap: 16 },
-  label:   { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.textPrimary, marginBottom: -8 },
+  errorBox:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#FECACA' },
+  errorText: { flex: 1, fontSize: FontSize.sm, color: '#DC2626' },
 
-  phoneRow:  { flexDirection: 'row', gap: 8 },
-  prefix:    {
-    backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: BorderRadius.md, paddingHorizontal: 14, justifyContent: 'center',
-  },
-  prefixText:{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  phoneInput:{
-    flex: 1, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: BorderRadius.md, paddingHorizontal: 16, paddingVertical: 14,
-    fontSize: FontSize.lg, fontWeight: FontWeight.semibold, color: Colors.textPrimary,
-  },
+  altAction:     { alignSelf: 'flex-start' },
+  altActionText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
 
-  errorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEE2E2', borderRadius: BorderRadius.md, padding: 12, borderWidth: 1, borderColor: '#FECACA' },
-  errorText: { flex: 1, fontSize: FontSize.sm, color: Colors.danger },
+  btn:     { borderRadius: 16, overflow: 'hidden', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 20, elevation: 10 },
+  btnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 17 },
+  btnText: { color: '#fff', fontSize: FontSize.lg, fontWeight: FontWeight.bold },
 
-  createAccountBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.tealXLight, borderRadius: BorderRadius.md,
-    padding: 12, borderWidth: 1, borderColor: Colors.tealLight,
-  },
-  createAccountText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.primary },
-
-  btn: {
-    backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: BorderRadius.lg,
-    alignItems: 'center', marginTop: 8,
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
-  },
-  btnInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  btnText:  { color: '#fff', fontSize: FontSize.lg, fontWeight: FontWeight.bold },
-
-  switchBtn:  { flexDirection: 'row', justifyContent: 'center', paddingVertical: 8 },
-  switchText: { fontSize: FontSize.base, color: Colors.textSecondary },
-  switchLink: { fontSize: FontSize.base, color: Colors.primary, fontWeight: FontWeight.bold },
+  switchRow: { flexDirection: 'row', justifyContent: 'center', paddingTop: 4 },
+  switchText:{ fontSize: FontSize.base, color: '#6B7280' },
+  switchLink:{ fontSize: FontSize.base, color: Colors.primary, fontWeight: FontWeight.bold },
 })

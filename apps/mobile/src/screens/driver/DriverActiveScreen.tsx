@@ -95,7 +95,7 @@ export default function DriverActiveScreen({ route, navigation }: any) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#0D9488', '#1E3A5F']}
+        colors={['#1AAFC9', '#1C2E4A']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}

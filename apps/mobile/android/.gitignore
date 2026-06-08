@@ -14,3 +14,7 @@ local.properties
 
 # Bundle artifacts
 *.jsbundle
+
+# Release signing — do not commit passwords or keystore
+keystore.properties
+app/sportnexus-release.keystore

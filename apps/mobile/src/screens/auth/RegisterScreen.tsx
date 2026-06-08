@@ -1,30 +1,24 @@
-import React, { useState, useRef } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Animated } from 'react-native'
+import React, { useState } from 'react'
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StatusBar,
+} from 'react-native'
+import { MotiView } from 'moti'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { authAPI } from '../../services/api'
-import { useAuthStore } from '../../store/authStore'
 import { Colors, FontSize, FontWeight, BorderRadius } from '../../constants/theme'
 
-const SPORT_DECO = [
-  { emoji: '🏏', top: 80,  left: -12, size: 52, opacity: 0.07, rotate: '-15deg' },
-  { emoji: '⚽', top: 160, right: -8, size: 48, opacity: 0.07, rotate: '10deg'  },
-  { emoji: '🥊', top: 260, left: 10,  size: 44, opacity: 0.07, rotate: '-8deg'  },
-  { emoji: '🎾', top: 340, right: 14, size: 46, opacity: 0.07, rotate: '20deg'  },
-  { emoji: '🏊', top: 440, left: -6,  size: 50, opacity: 0.07, rotate: '-5deg'  },
-  { emoji: '🏀', top: 520, right: -4, size: 48, opacity: 0.07, rotate: '12deg'  },
-]
-
-function LightInput({ icon, label, value, onChange, placeholder, keyboardType, autoCapitalize, prefix, maxLength, editable = true }: any) {
+function Field({ icon, label, value, onChange, placeholder, keyboardType, autoCapitalize, prefix, maxLength }: any) {
   const [focused, setFocused] = useState(false)
   return (
-    <View style={inputStyles.wrap}>
-      <Text style={inputStyles.label}>{label}</Text>
-      <View style={[inputStyles.row, focused && inputStyles.rowFocused]}>
-        {icon && <Ionicons name={icon} size={18} color={focused ? Colors.primary : '#9CA3AF'} />}
-        {prefix && <Text style={inputStyles.prefix}>{prefix}</Text>}
+    <View style={fieldStyles.wrap}>
+      <Text style={fieldStyles.label}>{label}</Text>
+      <View style={[fieldStyles.row, focused && fieldStyles.focused]}>
+        <Ionicons name={icon} size={17} color={focused ? Colors.primary : '#9CA3AF'} />
+        {prefix && <Text style={fieldStyles.prefix}>{prefix}</Text>}
         <TextInput
-          style={inputStyles.input}
+          style={fieldStyles.input}
           value={value}
           onChangeText={onChange}
           placeholder={placeholder}
@@ -32,7 +26,6 @@ function LightInput({ icon, label, value, onChange, placeholder, keyboardType, a
           keyboardType={keyboardType ?? 'default'}
           autoCapitalize={autoCapitalize ?? 'none'}
           maxLength={maxLength}
-          editable={editable}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         />
@@ -41,13 +34,13 @@ function LightInput({ icon, label, value, onChange, placeholder, keyboardType, a
   )
 }
 
-const inputStyles = StyleSheet.create({
-  wrap:       { gap: 6 },
-  label:      { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8 },
-  row:        { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderRadius: BorderRadius.md, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: '#E5E7EB' },
-  rowFocused: { borderColor: Colors.primary, borderWidth: 1.5 },
-  prefix:     { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.textSecondary },
-  input:      { flex: 1, fontSize: FontSize.base, color: Colors.textPrimary },
+const fieldStyles = StyleSheet.create({
+  wrap:    { gap: 7 },
+  label:   { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.8 },
+  row:     { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F9FAFB', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1.5, borderColor: '#E5E7EB' },
+  focused: { borderColor: Colors.primary, backgroundColor: '#fff' },
+  prefix:  { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: '#374151' },
+  input:   { flex: 1, fontSize: FontSize.base, color: '#111827' },
 })
 
 export default function RegisterScreen({ navigation }: any) {
@@ -56,19 +49,10 @@ export default function RegisterScreen({ navigation }: any) {
   const [phone, setPhone]     = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
-  const logoScale   = useRef(new Animated.Value(0.8)).current
-  const logoOpacity = useRef(new Animated.Value(0)).current
-
-  React.useEffect(() => {
-    Animated.parallel([
-      Animated.spring(logoScale,   { toValue: 1, tension: 60, friction: 6, useNativeDriver: true }),
-      Animated.timing(logoOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-    ]).start()
-  }, [])
 
   async function handleRegister() {
     if (!name.trim() || !email.trim() || phone.length < 10) {
-      setError('Please fill all fields correctly.')
+      setError('Please fill in all fields correctly.')
       return
     }
     setError('')
@@ -84,132 +68,96 @@ export default function RegisterScreen({ navigation }: any) {
       } else {
         setError(err.response?.data?.error?.message ?? 'Registration failed. Please try again.')
       }
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   return (
-    <View style={styles.bg}>
-      {SPORT_DECO.map((d, i) => (
-        <Text
-          key={i}
-          style={{
-            position: 'absolute', top: d.top,
-            ...(d.left !== undefined ? { left: d.left } : { right: (d as any).right }),
-            fontSize: d.size, opacity: d.opacity,
-            transform: [{ rotate: d.rotate }],
-          }}
-        >{d.emoji}</Text>
-      ))}
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient colors={['#0D1B2A', '#1C2E4A', '#1AAFC9']} start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 1 }} style={StyleSheet.absoluteFill} />
+      <View style={styles.circle1} />
+      <View style={styles.circle2} />
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={20} color={Colors.textSecondary} />
-        </TouchableOpacity>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-        <LinearGradient
-          colors={[Colors.primary, Colors.navy]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroStrip}
-        >
-          <Animated.View style={[styles.heroIconWrap, { transform: [{ scale: logoScale }], opacity: logoOpacity }]}>
-            <View style={styles.heroIcon}>
-              <Text style={{ fontSize: 38 }}>🏆</Text>
+          {/* Header */}
+          <MotiView from={{ opacity: 0, translateY: -20 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', damping: 18, stiffness: 140 }} style={styles.header}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={20} color="rgba(255,255,255,0.85)" />
+            </TouchableOpacity>
+            <View style={styles.brandRow}>
+              <View style={styles.brandDot} />
+              <Text style={styles.brandName}>SportNexus</Text>
             </View>
-          </Animated.View>
-          <Text style={styles.heroTitle}>Join SportNexus</Text>
-          <Text style={styles.heroSub}>Book your spot at elite sports academies</Text>
-        </LinearGradient>
+            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.subtitle}>Join thousands of athletes today</Text>
+          </MotiView>
 
-        <View style={styles.card}>
-          <LightInput icon="person-outline" label="Full Name" value={name} onChange={setName} placeholder="Rahul Sharma" autoCapitalize="words" />
-          <LightInput icon="mail-outline" label="Email Address" value={email} onChange={setEmail} placeholder="you@example.com" keyboardType="email-address" />
-          <LightInput icon="call-outline" label="Phone Number" value={phone} onChange={(t: string) => setPhone(t.replace(/\D/g, '').slice(0, 10))} placeholder="9876543210" keyboardType="phone-pad" maxLength={10} prefix="+91" />
-        </View>
+          {/* Form card */}
+          <MotiView from={{ opacity: 0, translateY: 40 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', delay: 150, damping: 18, stiffness: 140 }} style={styles.card}>
+            {[
+              { icon: 'person-outline', label: 'Full Name', value: name, onChange: (t: string) => { setName(t); setError('') }, placeholder: 'Rahul Sharma', autoCapitalize: 'words', delay: 0 },
+              { icon: 'mail-outline', label: 'Email Address', value: email, onChange: (t: string) => { setEmail(t); setError('') }, placeholder: 'you@example.com', keyboardType: 'email-address', delay: 60 },
+              { icon: 'call-outline', label: 'Phone Number', value: phone, onChange: (t: string) => { setPhone(t.replace(/\D/g, '').slice(0, 10)); setError('') }, placeholder: '98765 43210', keyboardType: 'phone-pad', maxLength: 10, prefix: '+91', delay: 120 },
+            ].map((f) => (
+              <MotiView key={f.label} from={{ opacity: 0, translateX: -16 }} animate={{ opacity: 1, translateX: 0 }} transition={{ type: 'spring', delay: 200 + f.delay, damping: 18, stiffness: 160 }}>
+                <Field {...f} />
+              </MotiView>
+            ))}
 
-        {!!error && (
-          <View style={styles.errorBox}>
-            <Ionicons name="alert-circle-outline" size={15} color="#EF4444" />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        <TouchableOpacity style={styles.btn} onPress={handleRegister} disabled={loading} activeOpacity={0.88}>
-          <LinearGradient colors={[Colors.primary, '#0A6E65']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btnGrad}>
-            {loading ? <ActivityIndicator color="#fff" /> : (
-              <>
-                <Text style={styles.btnText}>Send OTP</Text>
-                <Ionicons name="arrow-forward" size={18} color="#fff" />
-              </>
+            {!!error && (
+              <View style={styles.errorBox}>
+                <Ionicons name="alert-circle" size={15} color="#DC2626" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
             )}
-          </LinearGradient>
-        </TouchableOpacity>
 
-        <TouchableOpacity style={styles.switchBtn} onPress={() => navigation.replace('Login')}>
-          <Text style={styles.switchText}>Already have an account? </Text>
-          <Text style={styles.switchLink}>Sign In</Text>
-        </TouchableOpacity>
-      </ScrollView>
+            <TouchableOpacity style={styles.btn} onPress={handleRegister} disabled={loading} activeOpacity={0.88}>
+              <LinearGradient colors={['#1AAFC9', '#0E8FA8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btnGrad}>
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <><Text style={styles.btnText}>Create Account</Text><Ionicons name="arrow-forward" size={18} color="#fff" /></>
+                }
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.switchRow} onPress={() => navigation.replace('Login')}>
+              <Text style={styles.switchText}>Already have an account? </Text>
+              <Text style={styles.switchLink}>Sign In</Text>
+            </TouchableOpacity>
+          </MotiView>
+
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  bg:     { flex: 1, backgroundColor: Colors.background },
-  scroll: { flexGrow: 1, padding: 24, paddingTop: 56, paddingBottom: 48, gap: 20, alignItems: 'center' },
+  root:     { flex: 1 },
+  circle1:  { position: 'absolute', top: -80, right: -50, width: 260, height: 260, borderRadius: 130, backgroundColor: 'rgba(26,175,201,0.08)' },
+  circle2:  { position: 'absolute', bottom: 100, left: -70, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.03)' },
+  scroll:   { flexGrow: 1, paddingHorizontal: 24, paddingTop: 56, paddingBottom: 40, gap: 24 },
 
-  backBtn: {
-    alignSelf: 'flex-start', width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: '#E5E7EB',
-  },
+  header:   { gap: 8 },
+  backBtn:  { width: 42, height: 42, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  brandDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary },
+  brandName:{ fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: 'rgba(255,255,255,0.5)', letterSpacing: 1.5, textTransform: 'uppercase' },
+  title:    { fontSize: 32, fontWeight: FontWeight.black, color: '#fff', letterSpacing: -1 },
+  subtitle: { fontSize: FontSize.base, color: 'rgba(255,255,255,0.55)' },
 
-  heroStrip: {
-    width: '100%', borderRadius: BorderRadius.xl, paddingVertical: 28,
-    paddingHorizontal: 24, alignItems: 'center', gap: 8,
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25, shadowRadius: 20, elevation: 12,
-  },
-  heroIconWrap: { marginBottom: 4 },
-  heroIcon: {
-    width: 72, height: 72, borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)',
-  },
-  heroTitle: { fontSize: FontSize['2xl'], fontWeight: FontWeight.black, color: '#fff', letterSpacing: -0.5 },
-  heroSub:   { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.8)', textAlign: 'center' },
+  card:     { backgroundColor: '#fff', borderRadius: 24, padding: 24, gap: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.15, shadowRadius: 40, elevation: 20 },
 
-  card: {
-    width: '100%', gap: 18,
-    backgroundColor: '#F9FAFB',
-    borderRadius: BorderRadius.xl, padding: 20,
-    borderWidth: 1, borderColor: '#E5E7EB',
-  },
+  errorBox:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#FECACA' },
+  errorText: { flex: 1, fontSize: FontSize.sm, color: '#DC2626' },
 
-  errorBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#FEF2F2', borderRadius: BorderRadius.md,
-    padding: 12, width: '100%',
-    borderWidth: 1, borderColor: '#FECACA',
-  },
-  errorText: { fontSize: FontSize.sm, color: '#EF4444', flex: 1 },
+  btn:     { borderRadius: 16, overflow: 'hidden', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 20, elevation: 10, marginTop: 4 },
+  btnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 17 },
+  btnText: { color: '#fff', fontSize: FontSize.lg, fontWeight: FontWeight.bold },
 
-  btn: {
-    width: '100%', borderRadius: BorderRadius.lg, overflow: 'hidden',
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3, shadowRadius: 16, elevation: 10,
-  },
-  btnGrad:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
-  btnText:    { color: '#fff', fontSize: FontSize.lg, fontWeight: FontWeight.bold },
-
-  switchBtn:  { flexDirection: 'row', justifyContent: 'center', paddingVertical: 8 },
-  switchText: { fontSize: FontSize.base, color: Colors.textSecondary },
-  switchLink: { fontSize: FontSize.base, color: Colors.primary, fontWeight: FontWeight.bold },
+  switchRow: { flexDirection: 'row', justifyContent: 'center', paddingTop: 4 },
+  switchText:{ fontSize: FontSize.base, color: '#6B7280' },
+  switchLink:{ fontSize: FontSize.base, color: Colors.primary, fontWeight: FontWeight.bold },
 })

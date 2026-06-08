@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react'
-import { StyleSheet, View, Text } from 'react-native'
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native'
 import MapView, { PROVIDER_GOOGLE, Polyline, Marker, Camera } from 'react-native-maps'
+import { Ionicons } from '@expo/vector-icons'
 
 interface Props {
   driverLat: number
@@ -73,6 +74,13 @@ export default function TrackingMap({
     }, 600)
   }, [])
 
+  function recenter() {
+    mapRef.current?.animateCamera(
+      { center: { latitude: driverLat, longitude: driverLng }, zoom: 15 },
+      { duration: 500 }
+    )
+  }
+
   return (
     <View style={styles.container}>
       <MapView
@@ -103,7 +111,7 @@ export default function TrackingMap({
                   { latitude: destLat,   longitude: destLng },
                 ]
           }
-          strokeColor="#0D9488"
+          strokeColor="#1AAFC9"
           strokeWidth={4}
           lineDashPattern={undefined}
         />
@@ -147,6 +155,11 @@ export default function TrackingMap({
           </View>
         </Marker>
       </MapView>
+
+      {/* ── Recenter button ───────────────────────────────── */}
+      <TouchableOpacity style={styles.recenterBtn} onPress={recenter} activeOpacity={0.85}>
+        <Ionicons name="locate" size={20} color="#1AAFC9" />
+      </TouchableOpacity>
     </View>
   )
 }
@@ -157,7 +170,7 @@ const styles = StyleSheet.create({
 
   driverMarker: {
     width: 46, height: 46, borderRadius: 23,
-    backgroundColor: '#0D9488',
+    backgroundColor: '#1AAFC9',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 }, elevation: 10,
@@ -168,13 +181,30 @@ const styles = StyleSheet.create({
   pickupMarker: { alignItems: 'center' },
   pickupDot:    {
     width: 22, height: 22, borderRadius: 11,
-    backgroundColor: '#1E3A5F',
+    backgroundColor: '#1C2E4A',
     borderWidth: 3, borderColor: '#fff',
     shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4, elevation: 8,
   },
-  pickupStem: { width: 2.5, height: 8, backgroundColor: '#1E3A5F' },
+  pickupStem: { width: 2.5, height: 8, backgroundColor: '#1C2E4A' },
 
   academyMarker: { alignItems: 'center' },
   academyMarkerIcon: { fontSize: 26 },
   academyMarkerStem: { width: 2.5, height: 6, backgroundColor: '#475A6E' },
+
+  recenterBtn: {
+    position: 'absolute',
+    bottom: 200,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+  },
 })

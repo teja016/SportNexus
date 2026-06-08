@@ -115,7 +115,7 @@ export default async function enrollmentRoutes(fastify: FastifyInstance) {
           },
         },
         payment: true,
-        transitSessions: { orderBy: { date: 'desc' }, take: 1 },
+        transitPassenger: { include: { session: true } },
       },
       orderBy: { enrolledAt: 'desc' },
     })
@@ -133,7 +133,7 @@ export default async function enrollmentRoutes(fastify: FastifyInstance) {
       include: {
         slot: { include: { program: { include: { academy: true } } } },
         payment: true,
-        transitSessions: { orderBy: { date: 'desc' }, take: 5 },
+        transitPassenger: { include: { session: true } },
         user: { select: { id: true, name: true, phone: true } },
       },
     })

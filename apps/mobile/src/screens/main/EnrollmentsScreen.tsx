@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native'
+import { MotiView } from 'moti'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useQuery } from '@tanstack/react-query'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { enrollmentAPI } from '../../services/api'
+import { useAuthStore } from '../../store/authStore'
 import { useLocalEnrollmentsStore } from '../../store/localEnrollmentsStore'
 import { formatCurrency, SPORT_ICONS } from '@sportnexus/utils'
 import { Enrollment } from '@sportnexus/types'
@@ -27,6 +29,7 @@ function EnrollmentCard({ enrollment, navigation }: { enrollment: Enrollment; na
   const sport   = program?.sportType ?? ''
   const sportColor = SportColors[sport] ?? Colors.primary
   const status  = STATUS_CONFIG[enrollment.status] ?? STATUS_CONFIG.PENDING
+  const photo   = academy?.photos?.[0]?.url
 
   return (
     <TouchableOpacity
@@ -34,27 +37,35 @@ function EnrollmentCard({ enrollment, navigation }: { enrollment: Enrollment; na
       onPress={() => navigation.navigate('EnrollmentDetail', { enrollment })}
       activeOpacity={0.88}
     >
-      {/* Left color accent bar */}
-      <View style={[styles.cardAccent, { backgroundColor: sportColor }]} />
+      {/* Image banner */}
+      <View style={styles.cardBanner}>
+        {photo ? (
+          <Image source={{ uri: photo }} style={styles.bannerImg} resizeMode="cover" />
+        ) : (
+          <View style={[styles.bannerImg, { backgroundColor: sportColor + '20', alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={{ fontSize: 36 }}>{SPORT_ICONS?.[sport] ?? '🏅'}</Text>
+          </View>
+        )}
+        <LinearGradient colors={['transparent', 'rgba(15,23,42,0.55)']} locations={[0.3, 1]} style={styles.bannerGradient} />
+
+        {/* Sport label bottom-left over image */}
+        <View style={[styles.bannerSport, { backgroundColor: sportColor }]}>
+          <Text style={styles.bannerSportEmoji}>{SPORT_ICONS?.[sport] ?? '🏅'}</Text>
+          <Text style={styles.bannerSportText}>{sport}</Text>
+        </View>
+
+        {/* Status badge top-right */}
+        <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+          <Ionicons name={status.icon as any} size={11} color={status.color} />
+          <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+        </View>
+      </View>
 
       <View style={styles.cardContent}>
-        {/* Header row */}
+        {/* Header */}
         <View style={styles.cardHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.academyName} numberOfLines={1}>{academy?.name ?? '—'}</Text>
-            <View style={styles.programRow}>
-              {!!sport && (
-                <View style={[styles.sportIconWrap, { backgroundColor: sportColor + '18' }]}>
-                  <Text style={styles.sportEmoji}>{SPORT_ICONS?.[sport] ?? ''}</Text>
-                </View>
-              )}
-              <Text style={styles.programName}>{program?.name ?? '—'}</Text>
-            </View>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <Ionicons name={status.icon as any} size={11} color={status.color} />
-            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
-          </View>
+          <Text style={styles.academyName} numberOfLines={1}>{academy?.name ?? '—'}</Text>
+          <Text style={styles.programName}>{program?.name ?? '—'}</Text>
         </View>
 
         {/* Stats chips row */}
@@ -119,11 +130,14 @@ function EnrollmentCard({ enrollment, navigation }: { enrollment: Enrollment; na
 export default function EnrollmentsScreen({ navigation }: any) {
   const [activeTab, setActiveTab] = useState(0)
   const { enrollments: localEnrollments } = useLocalEnrollmentsStore()
+  const { isAuthenticated, user } = useAuthStore()
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['my-enrollments'],
+    queryKey: ['my-enrollments', user?.id],
     queryFn:  () => enrollmentAPI.getMyEnrollments(),
     staleTime: 30 * 1000,
+    enabled:  isAuthenticated,
+    retry:    2,
   })
 
   useFocusEffect(React.useCallback(() => { refetch() }, [refetch]))
@@ -133,23 +147,29 @@ export default function EnrollmentsScreen({ navigation }: any) {
   const merged: Enrollment[] = apiEnrollments.map((apiE) => {
     const local = localEnrollments.find((l) => l.id === apiE.id)
     if (local && (local as any).payment) {
+      // Always trust API for status — only supplement with local payment/date data
       return { ...apiE, payment: (local as any).payment, startDate: local.startDate ?? (apiE as any).startDate, endDate: local.endDate ?? (apiE as any).endDate } as Enrollment
     }
     return apiE
   })
-  const all: Enrollment[] = [
-    ...merged,
-    ...localEnrollments.filter((e) => !apiIds.has(e.id)),
-  ]
-  const active = all.filter((e) => ['PENDING', 'CONFIRMED', 'ACTIVE'].includes(e.status))
-  const past   = all.filter((e) => ['CANCELLED', 'COMPLETED', 'EXPIRED'].includes(e.status))
-  const list   = activeTab === 0 ? active : past
+  // Local-only enrollments: only show ones that belong to current user + are not stale-cancelled
+  const localOnly = localEnrollments.filter(
+    (e) => !apiIds.has(e.id) &&
+      (e.userId === user?.id || e.userId === 'dev') &&
+      e.status !== 'CANCELLED' &&
+      e.status !== 'EXPIRED'
+  )
+  const all: Enrollment[] = [...merged, ...localOnly]
+  const active    = all.filter((e) => ['PENDING', 'CONFIRMED', 'ACTIVE'].includes(e.status))
+  const completed = all.filter((e) => e.status === 'EXPIRED')
+  const cancelled = all.filter((e) => e.status === 'CANCELLED')
+  const list = activeTab === 0 ? all : activeTab === 1 ? active : activeTab === 2 ? completed : cancelled
 
   return (
     <View style={styles.container}>
       {/* ── Compact gradient header strip ─────────────────── */}
       <LinearGradient
-        colors={['#0D9488', '#1E3A5F']}
+        colors={['#1AAFC9', '#1C2E4A']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
@@ -165,18 +185,20 @@ export default function EnrollmentsScreen({ navigation }: any) {
               <Text style={styles.headerChipText}>{active.length} active</Text>
             </View>
             <View style={[styles.headerChip, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
-              <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.6)" />
-              <Text style={[styles.headerChipText, { color: 'rgba(255,255,255,0.6)' }]}>{past.length} past</Text>
+              <Ionicons name="close-circle-outline" size={13} color="rgba(255,255,255,0.6)" />
+              <Text style={[styles.headerChipText, { color: 'rgba(255,255,255,0.6)' }]}>{cancelled.length} cancelled</Text>
             </View>
           </View>
         </View>
       </LinearGradient>
 
       {/* ── Tabs ─────────────────────────────────────────── */}
-      <View style={styles.tabs}>
+      <View style={styles.tabsScroll}>
         {[
-          { label: 'Active',  count: active.length, icon: 'fitness-outline' as const },
-          { label: 'Past',    count: past.length,   icon: 'time-outline' as const },
+          { label: 'All',       count: all.length,       icon: 'layers-outline' as const },
+          { label: 'Active',    count: active.length,    icon: 'fitness-outline' as const },
+          { label: 'Completed', count: completed.length, icon: 'trophy-outline' as const },
+          { label: 'Cancelled', count: cancelled.length, icon: 'close-circle-outline' as const, danger: true },
         ].map((t, i) => (
           <TouchableOpacity
             key={t.label}
@@ -186,12 +208,12 @@ export default function EnrollmentsScreen({ navigation }: any) {
             <Ionicons
               name={t.icon}
               size={15}
-              color={activeTab === i ? Colors.primary : Colors.textMuted}
+              color={activeTab === i ? (t.danger ? Colors.danger : Colors.primary) : Colors.textMuted}
             />
-            <Text style={[styles.tabText, activeTab === i && styles.tabTextActive]}>{t.label}</Text>
+            <Text style={[styles.tabText, activeTab === i && (t.danger ? styles.tabTextDanger : styles.tabTextActive)]}>{t.label}</Text>
             {t.count > 0 && (
-              <View style={[styles.tabBadge, activeTab === i && styles.tabBadgeActive]}>
-                <Text style={[styles.tabBadgeText, activeTab === i && styles.tabBadgeTextActive]}>{t.count}</Text>
+              <View style={[styles.tabBadge, activeTab === i && (t.danger ? styles.tabBadgeDanger : styles.tabBadgeActive)]}>
+                <Text style={[styles.tabBadgeText, activeTab === i && (t.danger ? styles.tabBadgeTextDanger : styles.tabBadgeTextActive)]}>{t.count}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -209,22 +231,39 @@ export default function EnrollmentsScreen({ navigation }: any) {
           keyExtractor={(e) => e.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => <EnrollmentCard enrollment={item} navigation={navigation} />}
+          renderItem={({ item, index }) => (
+            <MotiView
+              from={{ opacity: 0, translateY: 24, scale: 0.97 }}
+              animate={{ opacity: 1, translateY: 0, scale: 1 }}
+              transition={{ type: 'spring', delay: index * 60, damping: 18, stiffness: 150 }}
+            >
+              <EnrollmentCard enrollment={item} navigation={navigation} />
+            </MotiView>
+          )}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyEmoji}>{activeTab === 0 ? '🏋️' : '📋'}</Text>
+              <Text style={styles.emptyEmoji}>
+                {activeTab === 0 ? '📋' : activeTab === 1 ? '🏋️' : activeTab === 2 ? '🏆' : '❌'}
+              </Text>
               <Text style={styles.emptyTitle}>
-                {activeTab === 0 ? 'No active enrollments' : 'No past enrollments'}
+                {activeTab === 0 ? 'No enrollments yet'
+                  : activeTab === 1 ? 'No active enrollments'
+                  : activeTab === 2 ? 'No completed enrollments'
+                  : 'No cancelled enrollments'}
               </Text>
               <Text style={styles.emptySubtitle}>
                 {activeTab === 0
                   ? 'Discover academies and book your first session'
-                  : 'Your completed and cancelled sessions appear here'}
+                  : activeTab === 1
+                  ? 'Your pending and confirmed sessions appear here'
+                  : activeTab === 2
+                  ? 'Expired sessions will appear here'
+                  : 'Cancelled sessions appear here'}
               </Text>
-              {activeTab === 0 && (
+              {activeTab <= 1 && (
                 <TouchableOpacity style={styles.browseBtn} onPress={() => navigation.navigate('Home')}>
                   <LinearGradient
-                    colors={['#0D9488', '#0A7A6B']}
+                    colors={['#1AAFC9', '#1592AA']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.browseBtnGradient}
@@ -246,7 +285,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
 
   /* ── Header ── */
-  header: { paddingTop: 52, paddingBottom: 20, paddingHorizontal: 20 },
+  header: { paddingTop: 52, paddingBottom: 20, paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
   headerInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { fontSize: FontSize['2xl'], fontWeight: FontWeight.extrabold, color: '#fff', letterSpacing: -0.5 },
   headerSub:   { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.6)', marginTop: 3 },
@@ -260,26 +299,29 @@ const styles = StyleSheet.create({
   headerChipText: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.85)', fontWeight: FontWeight.semibold },
 
   /* ── Tabs ── */
-  tabs: {
+  tabsScroll: {
     flexDirection: 'row',
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
   },
   tab: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingVertical: 14, paddingHorizontal: 4,
-    marginRight: 24,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingVertical: 13, paddingHorizontal: 8,
+    marginRight: 4,
     borderBottomWidth: 2.5, borderBottomColor: 'transparent',
   },
-  tabActive:        { borderBottomColor: Colors.primary },
-  tabText:          { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.textMuted },
-  tabTextActive:    { color: Colors.primary, fontWeight: FontWeight.bold },
-  tabBadge:         { backgroundColor: Colors.borderLight, paddingHorizontal: 7, paddingVertical: 2, borderRadius: BorderRadius.full },
-  tabBadgeActive:   { backgroundColor: Colors.tealLight },
-  tabBadgeText:     { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.bold },
+  tabActive:          { borderBottomColor: Colors.primary },
+  tabText:            { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.textMuted },
+  tabTextActive:      { color: Colors.primary, fontWeight: FontWeight.bold },
+  tabTextDanger:      { color: Colors.danger, fontWeight: FontWeight.bold },
+  tabBadge:           { backgroundColor: Colors.borderLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: BorderRadius.full },
+  tabBadgeActive:     { backgroundColor: Colors.tealLight },
+  tabBadgeDanger:     { backgroundColor: '#FEE2E2' },
+  tabBadgeText:       { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.bold },
   tabBadgeTextActive: { color: Colors.primary },
+  tabBadgeTextDanger: { color: Colors.danger },
 
   /* ── List ── */
   listContent: { padding: 16, gap: 12, paddingBottom: 32 },
@@ -290,27 +332,35 @@ const styles = StyleSheet.create({
 
   /* ── Enrollment Card ── */
   card: {
-    flexDirection: 'row',
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
-    ...Shadow.sm,
+    ...Shadow.md,
   },
-  cardAccent:  { width: 5 },
-  cardContent: { flex: 1, padding: 14, gap: 10 },
 
-  cardHeader:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  academyName: { fontSize: FontSize.base, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
-  programRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
-  sportIconWrap: { width: 20, height: 20, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  sportEmoji:  { fontSize: 12 },
-  programName: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  /* banner */
+  cardBanner:      { height: 90, position: 'relative' },
+  bannerImg:       { width: '100%', height: 90 },
+  bannerGradient:  { position: 'absolute', top: 0, left: 0, right: 0, height: 90 },
+  bannerSport: {
+    position: 'absolute', bottom: 8, left: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.full,
+  },
+  bannerSportEmoji: { fontSize: 10 },
+  bannerSportText:  { fontSize: 9, color: '#fff', fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.4 },
 
   statusBadge: {
+    position: 'absolute', top: 8, right: 8,
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 8, paddingVertical: 4, borderRadius: BorderRadius.full,
   },
-  statusText:  { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  statusText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+
+  cardContent: { padding: 14, gap: 10 },
+  cardHeader:  { gap: 2 },
+  academyName: { fontSize: FontSize.base, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
+  programName: { fontSize: FontSize.sm, color: Colors.textSecondary },
 
   detailsRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   detailChip:  {

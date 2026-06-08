@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, FlatList, Image, TouchableOpacity,
   Linking, StyleSheet, Dimensions, ActivityIndicator, Animated,
 } from 'react-native'
+import { MotiView } from 'moti'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useQuery } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -215,29 +216,59 @@ export default function AcademyDetailScreen({ route, navigation }: any) {
         {/* ── Programs ─────────────────────────────────────── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Programs</Text>
-          <View style={{ paddingHorizontal: 16, gap: 10 }}>
-            {programs.map((prog) => {
+          <View style={{ paddingHorizontal: 16, gap: 12 }}>
+            {programs.map((prog, idx) => {
               const c = SportColors[prog.sportType] ?? Colors.primary
+              const slots = (prog as any).slots ?? []
+              const totalSeats = slots.reduce((s: number, sl: any) => s + (sl.capacity ?? 0), 0)
+              const enrolled   = slots.reduce((s: number, sl: any) => s + (sl.enrolledCount ?? 0), 0)
+              const remaining  = totalSeats > 0 ? totalSeats - enrolled : null
+              const isPopular  = idx === 0 && programs.length > 1
               return (
-                <View key={prog.id} style={styles.programCard}>
-                  <View style={[styles.programAccent, { backgroundColor: c }]} />
-                  <View style={styles.programIcon}>
-                    <Text style={{ fontSize: 22 }}>{SPORT_ICONS[prog.sportType] ?? '🏅'}</Text>
+                <MotiView
+                  key={prog.id}
+                  from={{ opacity: 0, translateY: 20, scale: 0.96 }}
+                  animate={{ opacity: 1, translateY: 0, scale: 1 }}
+                  transition={{ type: 'spring', delay: idx * 80, damping: 18, stiffness: 150 }}
+                >
+                <View style={[styles.programCard, { borderLeftColor: c }]}>
+                  {/* Row 1: icon + name/ages + popular badge */}
+                  <View style={styles.programTopRow}>
+                    <View style={[styles.programIcon, { backgroundColor: c + '18' }]}>
+                      <Text style={{ fontSize: 22 }}>{SPORT_ICONS[prog.sportType] ?? '🏅'}</Text>
+                    </View>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <Text style={styles.programName} numberOfLines={1}>{prog.name}</Text>
+                      <Text style={styles.programMeta}>Ages {prog.ageGroupMin}–{prog.ageGroupMax} yrs · {prog.sportType}</Text>
+                    </View>
+                    {isPopular && (
+                      <View style={[styles.popularBadge, { backgroundColor: c }]}>
+                        <Text style={styles.popularText}>★ POPULAR</Text>
+                      </View>
+                    )}
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.programName}>{prog.name}</Text>
-                    <Text style={styles.programMeta}>
-                      Ages {prog.ageGroupMin}–{prog.ageGroupMax} yrs
-                    </Text>
-                  </View>
-                  <View style={styles.programRight}>
-                    <Text style={styles.programFee}>{formatCurrency(prog.feeMonthly)}</Text>
-                    <Text style={styles.programFeeSub}>/month</Text>
-                    <TouchableOpacity style={[styles.slotsBtn, { backgroundColor: c }]} onPress={() => handleViewSlots(prog)}>
-                      <Text style={styles.slotsBtnText}>View Slots</Text>
-                    </TouchableOpacity>
+
+                  {/* Row 2: fee + seats chip + button */}
+                  <View style={styles.programBottomRow}>
+                    <View>
+                      <Text style={[styles.programFee, { color: c }]}>{formatCurrency(prog.feeMonthly)}</Text>
+                      <Text style={styles.programFeeSub}>per month</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      {remaining !== null && remaining <= 10 && remaining > 0 && (
+                        <View style={styles.seatsChip}>
+                          <Ionicons name="alert-circle-outline" size={11} color="#D97706" />
+                          <Text style={styles.seatsText}>{remaining} left</Text>
+                        </View>
+                      )}
+                      <TouchableOpacity style={[styles.slotsBtn, { backgroundColor: c }]} onPress={() => handleViewSlots(prog)}>
+                        <Text style={styles.slotsBtnText}>View Slots</Text>
+                        <Ionicons name="arrow-forward" size={12} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
+                </MotiView>
               )
             })}
           </View>
@@ -338,14 +369,25 @@ const styles = StyleSheet.create({
   coachName:     { fontSize: FontSize.sm, color: Colors.textPrimary, fontWeight: FontWeight.bold, textAlign: 'center' },
   coachRole:     { fontSize: FontSize.xs, color: Colors.textMuted, textAlign: 'center' },
 
-  programCard:   { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: 14, ...Shadow.sm, overflow: 'hidden' },
-  programAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, borderRadius: 4 },
-  programIcon:   { width: 44, height: 44, borderRadius: BorderRadius.md, backgroundColor: Colors.borderLight, alignItems: 'center', justifyContent: 'center' },
-  programName:   { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  programMeta:   { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 3 },
-  programRight:  { alignItems: 'flex-end', gap: 2 },
-  programFee:    { fontSize: FontSize.lg, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
-  programFeeSub: { fontSize: FontSize.xs, color: Colors.textMuted },
-  slotsBtn:      { marginTop: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: BorderRadius.md },
-  slotsBtnText:  { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold },
+  programCard:      { borderRadius: BorderRadius.xl, padding: 16, gap: 14, borderWidth: 1, borderColor: Colors.border, borderLeftWidth: 4, backgroundColor: Colors.surface, ...Shadow.sm },
+  programTopRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  programIcon:      { width: 46, height: 46, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  programName:      { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.textPrimary },
+  programMeta:      { fontSize: FontSize.xs, color: Colors.textSecondary },
+  popularBadge:     { paddingHorizontal: 7, paddingVertical: 3, borderRadius: BorderRadius.full, flexShrink: 0 },
+  popularText:      { fontSize: 9, color: '#fff', fontWeight: FontWeight.extrabold, letterSpacing: 0.3 },
+  programBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  seatsChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#FEF3C7', paddingHorizontal: 7, paddingVertical: 4, borderRadius: BorderRadius.full,
+  },
+  seatsText:     { fontSize: FontSize.xs, color: '#D97706', fontWeight: FontWeight.semibold },
+  programFeeRow: { flexDirection: 'row', alignItems: 'baseline', gap: 1 },
+  programFee:    { fontSize: FontSize.xl, fontWeight: FontWeight.extrabold },
+  programFeeSub: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 1 },
+  slotsBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 16, paddingVertical: 9, borderRadius: BorderRadius.lg,
+  },
+  slotsBtnText: { fontSize: FontSize.sm, color: '#fff', fontWeight: FontWeight.bold },
 })

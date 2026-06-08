@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share } from 'react-native'
+import { MotiView } from 'moti'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import QRCode from 'react-native-qrcode-svg'
+import { useQueryClient } from '@tanstack/react-query'
 import { Enrollment } from '@sportnexus/types'
 import { formatCurrency, formatSlotTime } from '@sportnexus/utils'
 import { Colors, FontSize, BorderRadius, Shadow } from '../../constants/theme'
@@ -33,7 +35,8 @@ function Row({ icon, label, value }: { icon: string; label: string; value: strin
 }
 
 export default function EnrollmentDetailScreen({ route, navigation }: any) {
-  const { enrollments, removeEnrollment } = useLocalEnrollmentsStore()
+  const { enrollments, removeEnrollment, updateEnrollment } = useLocalEnrollmentsStore()
+  const queryClient = useQueryClient()
   const [showReview, setShowReview] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   // Accept either a full enrollment object (from EnrollmentsScreen) or just an ID (from BookingSuccess)
@@ -83,7 +86,7 @@ export default function EnrollmentDetailScreen({ route, navigation }: any) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* Header */}
-      <LinearGradient colors={['#0D9488', '#1E3A5F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+      <LinearGradient colors={['#1AAFC9', '#1C2E4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.academyIconWrap}>
             <Text style={{ fontSize: 28 }}>🏟️</Text>
@@ -99,6 +102,7 @@ export default function EnrollmentDetailScreen({ route, navigation }: any) {
       </LinearGradient>
 
       {/* Booking Reference */}
+      <MotiView from={{ opacity: 0, translateY: 20, scale: 0.97 }} animate={{ opacity: 1, translateY: 0, scale: 1 }} transition={{ type: 'spring', delay: 80, damping: 18, stiffness: 150 }}>
       <View style={styles.bookingCard}>
         <View style={{ flex: 1 }}>
           <Text style={styles.bookingLabel}>Booking Reference</Text>
@@ -112,8 +116,10 @@ export default function EnrollmentDetailScreen({ route, navigation }: any) {
           backgroundColor="#fff"
         />
       </View>
+      </MotiView>
 
       {/* Schedule */}
+      <MotiView from={{ opacity: 0, translateY: 24 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', delay: 160, damping: 18, stiffness: 150 }}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Schedule</Text>
         <View style={styles.card}>
@@ -136,8 +142,10 @@ export default function EnrollmentDetailScreen({ route, navigation }: any) {
           )}
         </View>
       </View>
+      </MotiView>
 
       {/* Program */}
+      <MotiView from={{ opacity: 0, translateY: 24 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', delay: 240, damping: 18, stiffness: 150 }}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Program</Text>
         <View style={styles.card}>
@@ -148,6 +156,25 @@ export default function EnrollmentDetailScreen({ route, navigation }: any) {
           <Row icon="cash-outline"     label="Monthly Fee" value={program ? formatCurrency(program.feeMonthly) : '—'} />
         </View>
       </View>
+      </MotiView>
+
+      {/* Location */}
+      {(academy?.address || enrollment.pickupAddress) && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Location</Text>
+          <View style={styles.card}>
+            {academy?.address && (
+              <Row icon="business-outline" label="Academy Address" value={academy.address} />
+            )}
+            {academy?.address && enrollment.pickupAddress && (
+              <View style={styles.divider} />
+            )}
+            {enrollment.pickupAddress && (
+              <Row icon="home-outline" label="Your Pickup Address" value={enrollment.pickupAddress} />
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Transport */}
       <View style={styles.section}>
@@ -158,18 +185,12 @@ export default function EnrollmentDetailScreen({ route, navigation }: any) {
             label="Pickup Service"
             value={enrollment.transportOpted ? 'Yes — Pickup & Drop' : 'No — Self Transport'}
           />
-          {enrollment.transportOpted && enrollment.pickupAddress && (
+          {enrollment.pickupDistance ? (
             <>
               <View style={styles.divider} />
-              <Row icon="location-outline" label="Pickup Address" value={enrollment.pickupAddress} />
+              <Row icon="map-outline" label="Distance to Academy" value={`${enrollment.pickupDistance} km`} />
             </>
-          )}
-          {enrollment.transportOpted && enrollment.pickupDistance && (
-            <>
-              <View style={styles.divider} />
-              <Row icon="map-outline" label="Distance" value={`${enrollment.pickupDistance} km`} />
-            </>
-          )}
+          ) : null}
         </View>
       </View>
 
@@ -256,13 +277,19 @@ export default function EnrollmentDetailScreen({ route, navigation }: any) {
                     try {
                       setCancelling(true)
                       await enrollmentAPI.cancel(enrollment.id)
-                      removeEnrollment?.(enrollment.id)
-                      navigation.goBack()
-                    } catch {
-                      Alert.alert('Error', 'Could not cancel enrollment. Please try again.')
-                    } finally {
-                      setCancelling(false)
+                    } catch (err: any) {
+                      const msg: string = err?.response?.data?.error?.message ?? ''
+                      // If it's already cancelled on the server, treat as success
+                      if (!msg.toLowerCase().includes('cancel') && err?.response?.status !== 404) {
+                        Alert.alert('Error', 'Could not cancel enrollment. Please try again.')
+                        setCancelling(false)
+                        return
+                      }
                     }
+                    updateEnrollment(enrollment.id, { status: 'CANCELLED' })
+                    queryClient.invalidateQueries({ queryKey: ['my-enrollments'] })
+                    setCancelling(false)
+                    navigation.goBack()
                   },
                 },
               ]

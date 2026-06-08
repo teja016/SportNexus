@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, FlatList, TouchableOpacity,
   Modal, Switch, StyleSheet, Image,
 } from 'react-native'
+import { MotiView } from 'moti'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useQuery } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -37,7 +38,7 @@ const SORT_OPTIONS = [
 
 const MAX_RECENT = 5
 
-// ─── Result Card ──────────────────────────────────────────────────────────────
+// ─── Result Card (image-first Zomato-style) ───────────────────────────────────
 const ResultCard = React.memo(function ResultCard({ item, onPress, onFavorite, isFav }: {
   item: Academy; onPress: () => void; onFavorite: () => void; isFav: boolean
 }) {
@@ -51,62 +52,59 @@ const ResultCard = React.memo(function ResultCard({ item, onPress, onFavorite, i
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.88}>
-      {/* Thumbnail */}
-      {photo ? (
-        <Image source={{ uri: photo }} style={styles.cardImg} />
-      ) : (
-        <View style={[styles.cardImg, styles.cardImgPlaceholder, { backgroundColor: sportColor + '15' }]}>
-          <Text style={styles.cardImgEmoji}>{SPORT_ICONS[sport] ?? '🏅'}</Text>
-        </View>
-      )}
-
-      {/* Body */}
-      <View style={styles.cardBody}>
-        <View style={styles.cardTop}>
-          <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
-          {item.isVerified && (
-            <Ionicons name="checkmark-circle" size={14} color={Colors.primary} />
-          )}
-        </View>
-
-        <View style={[styles.sportTag, { backgroundColor: sportColor + '15' }]}>
-          <Text style={[styles.sportTagText, { color: sportColor }]}>
-            {SPORT_ICONS[sport]} {sport}
-          </Text>
-        </View>
-
-        <View style={styles.cardMeta}>
-          <Ionicons name="star" size={11} color="#FBBF24" />
-          <Text style={styles.metaText}>{item.rating}</Text>
-          {item.distance !== undefined && (
-            <>
-              <View style={styles.metaDot} />
-              <Ionicons name="location-outline" size={11} color={Colors.textMuted} />
-              <Text style={styles.metaText}>{item.distance} km</Text>
-            </>
-          )}
-          {item.transportAvailable && (
-            <>
-              <View style={styles.metaDot} />
-              <Ionicons name="bus-outline" size={11} color={Colors.primary} />
-              <Text style={[styles.metaText, { color: Colors.primary }]}>Transit</Text>
-            </>
-          )}
-        </View>
-
-        {minFee > 0 && (
-          <Text style={styles.cardFee}>
-            ₹{minFee}<Text style={styles.cardFeeSub}>/mo</Text>
-          </Text>
+      {/* Image section */}
+      <View style={styles.cardImgWrap}>
+        {photo ? (
+          <Image source={{ uri: photo }} style={styles.cardImg} resizeMode="cover" />
+        ) : (
+          <View style={[styles.cardImg, styles.cardImgPlaceholder, { backgroundColor: sportColor + '18' }]}>
+            <Text style={styles.cardImgEmoji}>{SPORT_ICONS[sport] ?? '🏅'}</Text>
+          </View>
         )}
+        <LinearGradient
+          colors={['transparent', 'rgba(15,23,42,0.5)']}
+          locations={[0.4, 1]}
+          style={styles.cardImgGradient}
+        />
+        {/* Sport badge top-left */}
+        <View style={[styles.cardSportBadge, { backgroundColor: sportColor }]}>
+          <Text style={styles.cardSportEmoji}>{SPORT_ICONS[sport] ?? '🏅'}</Text>
+          <Text style={styles.cardSportText}>{sport}</Text>
+        </View>
+        {/* Rating top-right */}
+        <View style={styles.cardRatingBadge}>
+          <Ionicons name="star" size={10} color="#FBBF24" />
+          <Text style={styles.cardRatingText}>{item.rating}</Text>
+        </View>
+        {/* Favorite button */}
+        <TouchableOpacity style={styles.cardFavBtn} onPress={onFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={16} color={isFav ? '#EF4444' : '#fff'} />
+        </TouchableOpacity>
       </View>
 
-      {/* Right actions */}
-      <View style={styles.cardRight}>
-        <TouchableOpacity onPress={onFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? '#EF4444' : Colors.border} />
-        </TouchableOpacity>
-        <Ionicons name="chevron-forward" size={16} color={Colors.border} style={{ marginTop: 8 }} />
+      {/* Info section */}
+      <View style={styles.cardInfo}>
+        <View style={styles.cardTop}>
+          <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
+          {item.isVerified && <Ionicons name="checkmark-circle" size={14} color={Colors.primary} />}
+        </View>
+        <View style={styles.cardMeta}>
+          {item.distance !== undefined && (
+            <View style={styles.metaChip}>
+              <Ionicons name="location-outline" size={10} color={Colors.textMuted} />
+              <Text style={styles.metaChipText}>{item.distance} km</Text>
+            </View>
+          )}
+          {item.transportAvailable && (
+            <View style={[styles.metaChip, { backgroundColor: Colors.tealXLight }]}>
+              <Ionicons name="bus-outline" size={10} color={Colors.primary} />
+              <Text style={[styles.metaChipText, { color: Colors.primary }]}>Transit</Text>
+            </View>
+          )}
+          {minFee > 0 && (
+            <Text style={styles.cardFee}>₹{minFee}<Text style={styles.cardFeeSub}>/mo</Text></Text>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   )
@@ -190,13 +188,19 @@ export default function SearchScreen({ navigation }: any) {
     toggleFavorite(academy)
   }, [toggleFavorite])
 
-  const renderItem = useCallback(({ item }: { item: Academy }) => (
-    <ResultCard
-      item={item}
-      onPress={() => handleNavAcademy(item)}
-      onFavorite={() => handleFavorite(item)}
-      isFav={isFavorite(item.id)}
-    />
+  const renderItem = useCallback(({ item, index }: { item: Academy; index: number }) => (
+    <MotiView
+      from={{ opacity: 0, translateY: 20 }}
+      animate={{ opacity: 1, translateY: 0 }}
+      transition={{ type: 'spring', delay: index * 50, damping: 18, stiffness: 150 }}
+    >
+      <ResultCard
+        item={item}
+        onPress={() => handleNavAcademy(item)}
+        onFavorite={() => handleFavorite(item)}
+        isFav={isFavorite(item.id)}
+      />
+    </MotiView>
   ), [handleNavAcademy, handleFavorite, isFavorite])
 
   const keyExtractor = useCallback((i: Academy) => i.id, [])
@@ -215,7 +219,7 @@ export default function SearchScreen({ navigation }: any) {
 
       {/* ── Compact gradient header strip ─────────────────── */}
       <LinearGradient
-        colors={['#0D9488', '#1E3A5F']}
+        colors={['#1AAFC9', '#1C2E4A']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
@@ -418,7 +422,7 @@ export default function SearchScreen({ navigation }: any) {
 
           <TouchableOpacity style={styles.applyBtn} onPress={() => setShowFilters(false)}>
             <LinearGradient
-              colors={['#0D9488', '#0A7A6B']}
+              colors={['#1AAFC9', '#1592AA']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.applyBtnGradient}
@@ -438,7 +442,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
 
   /* ── Header ── */
-  header: { paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16 },
+  header: { paddingTop: 52, paddingBottom: 14, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   searchBox: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -501,22 +505,44 @@ const styles = StyleSheet.create({
   clearFiltersBtn: { marginTop: 8, paddingHorizontal: 20, paddingVertical: 10, borderRadius: BorderRadius.full, borderWidth: 1.5, borderColor: Colors.primary },
   clearFiltersText:{ fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.semibold },
 
-  /* ── Result Card ── */
-  card:             { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, overflow: 'hidden', ...Shadow.sm },
-  cardImg:          { width: 96, height: 96 },
+  /* ── Result Card (image-first) ── */
+  card:               { backgroundColor: Colors.surface, borderRadius: BorderRadius.xl, overflow: 'hidden', ...Shadow.md },
+  cardImgWrap:        { position: 'relative' },
+  cardImg:            { width: '100%', height: 140 },
   cardImgPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  cardImgEmoji:     { fontSize: 30 },
-  cardBody:         { flex: 1, padding: 12, gap: 4 },
-  cardTop:          { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cardName:         { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.textPrimary, flex: 1 },
-  cardRight:        { paddingVertical: 12, paddingRight: 12, alignItems: 'center', justifyContent: 'space-between' },
-  sportTag:         { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.full },
-  sportTagText:     { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
-  cardMeta:         { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText:         { fontSize: FontSize.xs, color: Colors.textSecondary },
-  metaDot:          { width: 3, height: 3, borderRadius: 1.5, backgroundColor: Colors.textMuted },
-  cardFee:          { fontSize: FontSize.base, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
-  cardFeeSub:       { fontSize: FontSize.xs, fontWeight: FontWeight.regular, color: Colors.textMuted },
+  cardImgEmoji:       { fontSize: 40 },
+  cardImgGradient:    { position: 'absolute', top: 0, left: 0, right: 0, height: 140 },
+  cardSportBadge: {
+    position: 'absolute', top: 10, left: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 9, paddingVertical: 4, borderRadius: BorderRadius.full,
+  },
+  cardSportEmoji: { fontSize: 10 },
+  cardSportText:  { fontSize: 9, color: '#fff', fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.4 },
+  cardRatingBadge: {
+    position: 'absolute', top: 10, right: 44,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: BorderRadius.full,
+  },
+  cardRatingText: { fontSize: 10, color: '#fff', fontWeight: FontWeight.bold },
+  cardFavBtn: {
+    position: 'absolute', top: 8, right: 8,
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center',
+  },
+  cardInfo:   { padding: 12, gap: 6 },
+  cardTop:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cardName:   { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.textPrimary, flex: 1 },
+  cardMeta:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: Colors.borderLight,
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: BorderRadius.full,
+  },
+  metaChipText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  cardFee:      { fontSize: FontSize.base, fontWeight: FontWeight.extrabold, color: Colors.textPrimary, marginLeft: 'auto' as any },
+  cardFeeSub:   { fontSize: FontSize.xs, fontWeight: FontWeight.regular as any, color: Colors.textMuted },
 
   /* ── Filter Sheet ── */
   modal:        { flex: 1, backgroundColor: Colors.surface, paddingHorizontal: 20 },

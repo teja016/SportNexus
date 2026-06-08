@@ -21,6 +21,7 @@ interface AuthState {
   setTokens: (accessToken: string, refreshToken: string) => void
   login: (user: User, accessToken: string, refreshToken: string) => void
   logout: () => void
+  resetAll: () => void
   clearDevToken: () => void
   setOnboarded: () => void
   setLocation: (lat: number, lng: number, address: string) => void
@@ -47,7 +48,7 @@ export const useAuthStore = create<AuthState>()(
         set({ user, accessToken, refreshToken, isAuthenticated: true }),
 
       logout: () => {
-        useLocalEnrollmentsStore.getState().clear()
+        // Do NOT clear localEnrollmentsStore — preserve enrollment data across logout/login
         useFavoritesStore.getState().clear()
         set({
           user: null,
@@ -55,6 +56,23 @@ export const useAuthStore = create<AuthState>()(
           refreshToken: null,
           isAuthenticated: false,
           locationSetup: false,
+        })
+      },
+
+      // Full reset: used on fresh APK install. Clears ALL state including onboarding.
+      resetAll: () => {
+        useLocalEnrollmentsStore.getState().clear()
+        useFavoritesStore.getState().clear()
+        set({
+          user: null,
+          accessToken: null,
+          refreshToken: null,
+          isAuthenticated: false,
+          isOnboarded: false,
+          locationSetup: false,
+          userLat: null,
+          userLng: null,
+          homeAddress: null,
         })
       },
 

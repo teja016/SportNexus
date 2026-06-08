@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native'
-import { useQuery } from '@tanstack/react-query'
+import { MotiView } from 'moti'
 import { Ionicons } from '@expo/vector-icons'
 import { slotAPI } from '../../services/api'
 import { useEnrollmentStore } from '../../store/enrollmentStore'
 import { formatCurrency, formatSlotTime, calculateTrainingFee } from '@sportnexus/utils'
 import { Colors, FontSize, BorderRadius, Shadow } from '../../constants/theme'
+import StepIndicator from '../../components/StepIndicator'
 
 export default function SlotConfirmScreen({ navigation }: any) {
   const { selectedAcademy, selectedProgram, selectedSlots, durationMonths } = useEnrollmentStore()
@@ -39,51 +40,75 @@ export default function SlotConfirmScreen({ navigation }: any) {
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
+      <StepIndicator steps={['Schedule', 'Transport', 'Secure']} current={0} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
-        <Text style={styles.heading}>Confirm Your Selection</Text>
+        <MotiView from={{ opacity: 0, translateY: -12 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', damping: 18 }}>
+          <Text style={styles.heading}>Confirm Your Selection</Text>
+        </MotiView>
 
-        {/* Academy + Program */}
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Academy</Text>
-          <Text style={styles.cardValue}>{selectedAcademy.name}</Text>
-          <View style={styles.divider} />
-          <Text style={styles.cardLabel}>Program</Text>
-          <Text style={styles.cardValue}>{selectedProgram.name}</Text>
-          <Text style={styles.cardSubValue}>Ages {selectedProgram.ageGroupMin}–{selectedProgram.ageGroupMax}</Text>
-        </View>
-
-        {/* Selected Slots */}
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Selected Slots ({selectedSlots.length})</Text>
-          {selectedSlots.map((slot) => (
-            <View key={slot.id} style={styles.slotRow}>
-              <Ionicons name="time-outline" size={16} color={Colors.primary} />
-              <Text style={styles.slotText}>{formatSlotTime(slot.timeStart, slot.timeEnd)}</Text>
-              <Text style={styles.slotDays}>{(slot.daysOfWeek ?? []).slice(0, 3).map((d: string) => d.slice(0,3)).join(', ')}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Duration */}
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Duration</Text>
-          <Text style={styles.cardValue}>{durationMonths} Month{durationMonths > 1 ? 's' : ''}</Text>
-        </View>
-
-        {/* Price Breakdown */}
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Price Breakdown</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceKey}>Training Fee ({durationMonths} mo × {selectedSlots.length} slot)</Text>
-            <Text style={styles.priceVal}>{formatCurrency(trainingFee)}</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.priceRow}>
-            <Text style={[styles.priceKey, { fontWeight: '700', color: Colors.textPrimary }]}>Subtotal</Text>
-            <Text style={styles.totalVal}>{formatCurrency(trainingFee)}</Text>
-          </View>
-          <Text style={styles.transportNote}>+ Transport fee (next step)</Text>
-        </View>
+        {[
+          {
+            delay: 80, content: (
+              <>
+                <Text style={styles.cardLabel}>Academy</Text>
+                <Text style={styles.cardValue}>{selectedAcademy.name}</Text>
+                <View style={styles.divider} />
+                <Text style={styles.cardLabel}>Program</Text>
+                <Text style={styles.cardValue}>{selectedProgram.name}</Text>
+                <Text style={styles.cardSubValue}>Ages {selectedProgram.ageGroupMin}–{selectedProgram.ageGroupMax}</Text>
+              </>
+            ),
+          },
+          {
+            delay: 160, content: (
+              <>
+                <Text style={styles.cardLabel}>Selected Slots ({selectedSlots.length})</Text>
+                {selectedSlots.map((slot) => (
+                  <View key={slot.id} style={styles.slotRow}>
+                    <Ionicons name="time-outline" size={16} color={Colors.primary} />
+                    <Text style={styles.slotText}>{formatSlotTime(slot.timeStart, slot.timeEnd)}</Text>
+                    <Text style={styles.slotDays}>{(slot.daysOfWeek ?? []).slice(0, 3).map((d: string) => d.slice(0,3)).join(', ')}</Text>
+                  </View>
+                ))}
+              </>
+            ),
+          },
+          {
+            delay: 240, content: (
+              <>
+                <Text style={styles.cardLabel}>Duration</Text>
+                <Text style={styles.cardValue}>{durationMonths} Month{durationMonths > 1 ? 's' : ''}</Text>
+              </>
+            ),
+          },
+          {
+            delay: 320, content: (
+              <>
+                <Text style={styles.cardLabel}>Price Breakdown</Text>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceKey}>Training Fee ({durationMonths} mo × {selectedSlots.length} slot)</Text>
+                  <Text style={styles.priceVal}>{formatCurrency(trainingFee)}</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.priceRow}>
+                  <Text style={[styles.priceKey, { fontWeight: '700', color: Colors.textPrimary }]}>Subtotal</Text>
+                  <Text style={styles.totalVal}>{formatCurrency(trainingFee)}</Text>
+                </View>
+                <Text style={styles.transportNote}>+ Transport fee (next step)</Text>
+              </>
+            ),
+          },
+        ].map(({ delay, content }, i) => (
+          <MotiView
+            key={i}
+            from={{ opacity: 0, translateY: 24, scale: 0.97 }}
+            animate={{ opacity: 1, translateY: 0, scale: 1 }}
+            transition={{ type: 'spring', delay, damping: 18, stiffness: 150 }}
+            style={styles.card}
+          >
+            {content}
+          </MotiView>
+        ))}
       </ScrollView>
 
       <View style={styles.bottomBar}>

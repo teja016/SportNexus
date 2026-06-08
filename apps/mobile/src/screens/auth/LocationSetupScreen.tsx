@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Alert, Animated } from 'react-native'
+import { MotiView } from 'moti'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import * as Location from 'expo-location'
@@ -19,15 +20,9 @@ export default function LocationSetupScreen() {
   const ring1Opacity = useRef(new Animated.Value(0.5)).current
   const ring2Scale   = useRef(new Animated.Value(1)).current
   const ring2Opacity = useRef(new Animated.Value(0.3)).current
-  const slideUp      = useRef(new Animated.Value(40)).current
-  const fadeIn       = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(pinScale, { toValue: 1, tension: 50, friction: 6, useNativeDriver: true }),
-      Animated.spring(slideUp,  { toValue: 0, tension: 60, friction: 7, useNativeDriver: true }),
-      Animated.timing(fadeIn,   { toValue: 1, duration: 500, useNativeDriver: true }),
-    ]).start()
+    Animated.spring(pinScale, { toValue: 1, tension: 50, friction: 6, useNativeDriver: true }).start()
 
     Animated.loop(Animated.sequence([
       Animated.parallel([
@@ -91,7 +86,12 @@ export default function LocationSetupScreen() {
         <Text style={styles.heroLabel}>SportNexus</Text>
       </LinearGradient>
 
-      <Animated.View style={[styles.content, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
+      <MotiView
+        from={{ opacity: 0, translateY: 40 }}
+        animate={{ opacity: 1, translateY: 0 }}
+        transition={{ type: 'spring', damping: 18, stiffness: 150 }}
+        style={styles.content}
+      >
 
         <View style={styles.pinArea}>
           <Animated.View style={[styles.ring, { transform: [{ scale: ring1Scale }], opacity: ring1Opacity }]} />
@@ -146,7 +146,7 @@ export default function LocationSetupScreen() {
           <Text style={styles.skipText}>Skip — use Hyderabad as default</Text>
         </TouchableOpacity>
 
-      </Animated.View>
+      </MotiView>
     </View>
   )
 }

@@ -9,7 +9,6 @@ import AuthLandingScreen from '../screens/auth/AuthLandingScreen'
 import LoginScreen from '../screens/auth/LoginScreen'
 import RegisterScreen from '../screens/auth/RegisterScreen'
 import OTPVerifyScreen from '../screens/auth/OTPVerifyScreen'
-import LocationSetupScreen from '../screens/auth/LocationSetupScreen'
 import MainTabNavigator from './MainTabNavigator'
 import DriverHomeScreen from '../screens/driver/DriverHomeScreen'
 import DriverActiveScreen from '../screens/driver/DriverActiveScreen'
@@ -22,19 +21,20 @@ import PaymentScreen from '../screens/enrollment/PaymentScreen'
 import BookingSuccessScreen from '../screens/enrollment/BookingSuccessScreen'
 import TransitTrackingScreen from '../screens/main/TransitTrackingScreen'
 import EditProfileScreen from '../screens/main/EditProfileScreen'
+import SearchScreen from '../screens/main/SearchScreen'
 
 const Stack = createNativeStackNavigator()
 
 const headerStyle = {
   headerShown: true,
   headerStyle: { backgroundColor: '#fff' },
-  headerTintColor: '#0D9488',
+  headerTintColor: '#1AAFC9',
   headerTitleStyle: { fontWeight: '700' as const, color: '#111827' },
   headerShadowVisible: false,
 }
 
 export default function RootNavigator() {
-  const { isAuthenticated, isOnboarded, locationSetup, user } = useAuthStore()
+  const { isAuthenticated, isOnboarded, user } = useAuthStore()
   const isDriver = user?.role === 'DRIVER'
 
   return (
@@ -52,8 +52,6 @@ export default function RootNavigator() {
             <Stack.Screen name="Register"    component={RegisterScreen} options={{ headerShown: false }} />
             <Stack.Screen name="OTPVerify"   component={OTPVerifyScreen} options={{ ...headerStyle, title: 'Verify OTP' }} />
           </>
-        ) : !locationSetup ? (
-          <Stack.Screen name="LocationSetup" component={LocationSetupScreen} />
         ) : isDriver ? (
           <>
             <Stack.Screen name="DriverHome"   component={DriverHomeScreen}   options={{ headerShown: false }} />
@@ -62,6 +60,7 @@ export default function RootNavigator() {
         ) : (
           <>
             <Stack.Screen name="MainTabs"  component={MainTabNavigator} />
+            <Stack.Screen name="Search" component={SearchScreen} options={{ ...headerStyle, title: 'Search' }} />
             <Stack.Screen
               name="AcademyDetail"
               component={AcademyDetailScreen}

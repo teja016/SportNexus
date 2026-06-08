@@ -51,34 +51,47 @@ export async function createDailySessions() {
     },
   })
 
+  // Group enrollments by slotId — one TransitSession serves every passenger on the same slot+date
+  const bySlot = new Map<string, typeof enrollments>()
+  for (const enrollment of enrollments) {
+    const list = bySlot.get(enrollment.slotId) ?? []
+    list.push(enrollment)
+    bySlot.set(enrollment.slotId, list)
+  }
+
   let created = 0
 
-  for (const enrollment of enrollments) {
+  for (const [slotId, slotEnrollments] of bySlot) {
     // Skip if session already exists for today
     const existing = await prisma.transitSession.findUnique({
       where: {
-        enrollmentId_date: {
-          enrollmentId: enrollment.id,
-          date: today,
-        },
+        slotId_date: { slotId, date: today },
       },
     })
 
     if (existing) continue
 
-    // Create session
+    // Create session with passenger records for every enrollment in this slot
     await prisma.transitSession.create({
       data: {
-        enrollmentId: enrollment.id,
+        slotId,
         date: today,
         status: 'SCHEDULED',
+        passengers: {
+          create: slotEnrollments.map((e, idx) => ({
+            enrollmentId: e.id,
+            stopOrder: idx + 1,
+          })),
+        },
       },
     })
 
     created++
 
-    // Enqueue 9 notifications if user has FCM token
-    if (enrollment.user.fcmToken) {
+    // Enqueue 9 notifications per passenger with an FCM token
+    for (const enrollment of slotEnrollments) {
+      if (!enrollment.user.fcmToken) continue
+
       const slotHour = parseInt(enrollment.slot.timeStart.split(':')[0], 10)
       const slotMinute = parseInt(enrollment.slot.timeStart.split(':')[1], 10)
       const sessionMs = today.getTime() + (slotHour * 60 + slotMinute) * 60000

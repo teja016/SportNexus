@@ -38,7 +38,18 @@ const initialState = {
 export const useEnrollmentStore = create<EnrollmentState>()((set) => ({
   ...initialState,
 
-  setAcademy: (academy) => set({ selectedAcademy: academy }),
+  setAcademy: (academy) => set({
+    selectedAcademy: academy,
+    selectedProgram: null,
+    selectedSlots: [],
+    durationMonths: 1,
+    transportOpted: false,
+    pickupAddress: null,
+    pickupLat: null,
+    pickupLng: null,
+    pickupDistance: 0,
+    startDate: null,
+  }),
   setProgram: (program) => set({ selectedProgram: program }),
   setSlots: (slots) => set({ selectedSlots: slots }),
   setDuration: (months) => set({ durationMonths: months }),

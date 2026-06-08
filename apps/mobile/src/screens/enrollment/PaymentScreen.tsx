@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, AppState, AppStateStatus, Linking, Modal, Alert,
 } from 'react-native'
+import { MotiView } from 'moti'
 import QRCode from 'react-native-qrcode-svg'
 import { Ionicons } from '@expo/vector-icons'
 import { enrollmentAPI, paymentAPI } from '../../services/api'
@@ -116,7 +117,15 @@ export default function PaymentScreen({ navigation }: any) {
       setShowQR(true)
     } catch (err: any) {
       setLoading(false)
-      setError(err.response?.data?.error?.message ?? err.message ?? 'Payment failed. Please try again.')
+      const code = err?.response?.data?.error?.code ?? ''
+      const msg  = err?.response?.data?.error?.message ?? err?.message ?? ''
+      if (code === 'DUPLICATE_ENROLLMENT' || msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('already enrolled')) {
+        setError('You already have an active enrollment for this slot. Check your Enrollments tab.')
+      } else if (code === 'SLOT_FULL' || msg.toLowerCase().includes('slot') && msg.toLowerCase().includes('full')) {
+        setError('This slot is full. Please choose a different time slot.')
+      } else {
+        setError(msg || 'Payment failed. Please try again.')
+      }
     }
   }
 
@@ -151,7 +160,8 @@ export default function PaymentScreen({ navigation }: any) {
         })
       }
 
-      const slot = selectedSlots[0]
+      const slot  = selectedSlots[0]
+      const state = useEnrollmentStore.getState()
       addEnrollment({
         id: pendingEnrollId,
         userId: useAuthStore.getState().user?.id ?? 'dev',
@@ -159,8 +169,13 @@ export default function PaymentScreen({ navigation }: any) {
         transportOpted,
         durationMonths,
         status: 'CONFIRMED',
-        enrolledAt: new Date().toISOString(),
-        updatedAt:  new Date().toISOString(),
+        enrolledAt:      new Date().toISOString(),
+        updatedAt:       new Date().toISOString(),
+        startDate:       state.startDate ? state.startDate.toISOString() : undefined,
+        pickupAddress:   state.pickupAddress ?? undefined,
+        pickupLat:       state.pickupLat ?? undefined,
+        pickupLng:       state.pickupLng ?? undefined,
+        pickupDistance:  state.pickupDistance || undefined,
         slot: {
           ...slot,
           program: { ...selectedProgram!, academy: selectedAcademy ?? undefined },
@@ -206,9 +221,12 @@ export default function PaymentScreen({ navigation }: any) {
   return (
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
-        <Text style={styles.heading}>Payment</Text>
+        <MotiView from={{ opacity: 0, translateY: -10 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', damping: 18 }}>
+          <Text style={styles.heading}>Payment</Text>
+        </MotiView>
 
         {/* Order Summary */}
+        <MotiView from={{ opacity: 0, translateY: 24, scale: 0.97 }} animate={{ opacity: 1, translateY: 0, scale: 1 }} transition={{ type: 'spring', delay: 80, damping: 18, stiffness: 150 }}>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Order Summary</Text>
           <View style={styles.summaryRow}>
@@ -243,9 +261,11 @@ export default function PaymentScreen({ navigation }: any) {
             <Text style={styles.totalVal}>{formatCurrency(totalFee)}</Text>
           </View>
         </View>
+        </MotiView>
 
         {/* UPI Merchant Info */}
         {selectedMethod === 'upi' && (
+          <MotiView from={{ opacity: 0, translateY: 20 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', delay: 180, damping: 18 }}>
           <View style={styles.upiCard}>
             <View style={styles.upiIconWrap}>
               <Ionicons name="qr-code-outline" size={22} color={Colors.primary} />
@@ -259,6 +279,7 @@ export default function PaymentScreen({ navigation }: any) {
               <Text style={styles.upiVerifiedText}>Verified</Text>
             </View>
           </View>
+          </MotiView>
         )}
 
         {!!error && (
@@ -270,9 +291,14 @@ export default function PaymentScreen({ navigation }: any) {
 
         {/* Payment Methods */}
         <Text style={styles.sectionTitle}>Payment Method</Text>
-        {PAYMENT_METHODS.map((method) => (
-          <TouchableOpacity
+        {PAYMENT_METHODS.map((method, idx) => (
+          <MotiView
             key={method.id}
+            from={{ opacity: 0, translateX: 24 }}
+            animate={{ opacity: 1, translateX: 0 }}
+            transition={{ type: 'spring', delay: 260 + idx * 80, damping: 18, stiffness: 150 }}
+          >
+          <TouchableOpacity
             style={[styles.methodCard, selectedMethod === method.id && styles.methodCardActive]}
             onPress={() => setSelectedMethod(method.id)}
           >
@@ -292,6 +318,7 @@ export default function PaymentScreen({ navigation }: any) {
               </View>
             )}
           </TouchableOpacity>
+          </MotiView>
         ))}
 
         <View style={styles.secureNote}>

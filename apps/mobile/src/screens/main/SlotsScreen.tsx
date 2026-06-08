@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { MotiView } from 'moti'
 import { useQuery } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { slotAPI } from '../../services/api'
@@ -97,31 +98,40 @@ export default function SlotsScreen({ route, navigation }: any) {
         {/* Morning Slots */}
         {morningSlots.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>🌅 Morning Slots</Text>
+            <MotiView from={{ opacity: 0, translateX: -12 }} animate={{ opacity: 1, translateX: 0 }} transition={{ type: 'timing', duration: 350 }}>
+              <Text style={styles.sectionTitle}>🌅 Morning Slots</Text>
+            </MotiView>
             <View style={styles.slotsGrid}>
-              {morningSlots.map((slot) => {
+              {morningSlots.map((slot, idx) => {
                 const isSelected = selectedSlots.some((s) => s.id === slot.id)
                 const isFull = slot.enrolledCount >= slot.totalCapacity
                 return (
-                  <TouchableOpacity
+                  <MotiView
                     key={slot.id}
-                    style={[styles.slotCard, isSelected && styles.slotCardSelected, isFull && styles.slotCardFull]}
-                    onPress={() => !isFull && toggleSlot(slot)}
-                    disabled={isFull}
-                    activeOpacity={isFull ? 1 : 0.8}
+                    style={styles.slotCellWrap}
+                    from={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: 'spring', delay: idx * 60, damping: 14, stiffness: 160 }}
                   >
-                    {isSelected && <Ionicons name="checkmark-circle" size={16} color={Colors.primary} style={styles.checkIcon} />}
-                    <Text style={[styles.slotTime, isSelected && styles.slotTimeSelected]}>
-                      {formatSlotTime(slot.timeStart, slot.timeEnd)}
-                    </Text>
-                    <Text style={styles.slotDays}>{slot.daysOfWeek.map((d: string) => d.slice(0, 3)).join(', ')}</Text>
-                    <View style={styles.capacityRow}>
-                      <View style={[styles.capacityBar, { width: `${Math.min((slot.enrolledCount / slot.totalCapacity) * 100, 100)}%` as any }]} />
-                    </View>
-                    <Text style={styles.capacityText}>
-                      {isFull ? 'Full' : `${slot.totalCapacity - slot.enrolledCount} seats left`}
-                    </Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.slotCard, isSelected && styles.slotCardSelected, isFull && styles.slotCardFull]}
+                      onPress={() => !isFull && toggleSlot(slot)}
+                      disabled={isFull}
+                      activeOpacity={isFull ? 1 : 0.8}
+                    >
+                      {isSelected && <Ionicons name="checkmark-circle" size={16} color={Colors.primary} style={styles.checkIcon} />}
+                      <Text style={[styles.slotTime, isSelected && styles.slotTimeSelected]}>
+                        {formatSlotTime(slot.timeStart, slot.timeEnd)}
+                      </Text>
+                      <Text style={styles.slotDays}>{slot.daysOfWeek.map((d: string) => d.slice(0, 3)).join(', ')}</Text>
+                      <View style={styles.capacityRow}>
+                        <View style={[styles.capacityBar, { width: `${Math.min((slot.enrolledCount / slot.totalCapacity) * 100, 100)}%` as any }]} />
+                      </View>
+                      <Text style={styles.capacityText}>
+                        {isFull ? 'Full' : `${slot.totalCapacity - slot.enrolledCount} seats left`}
+                      </Text>
+                    </TouchableOpacity>
+                  </MotiView>
                 )
               })}
             </View>
@@ -131,31 +141,40 @@ export default function SlotsScreen({ route, navigation }: any) {
         {/* Evening Slots */}
         {eveningSlots.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>🌆 Evening Slots</Text>
+            <MotiView from={{ opacity: 0, translateX: -12 }} animate={{ opacity: 1, translateX: 0 }} transition={{ type: 'timing', duration: 350, delay: 100 }}>
+              <Text style={styles.sectionTitle}>🌆 Evening Slots</Text>
+            </MotiView>
             <View style={styles.slotsGrid}>
-              {eveningSlots.map((slot) => {
+              {eveningSlots.map((slot, idx) => {
                 const isSelected = selectedSlots.some((s) => s.id === slot.id)
                 const isFull = slot.enrolledCount >= slot.totalCapacity
                 return (
-                  <TouchableOpacity
+                  <MotiView
                     key={slot.id}
-                    style={[styles.slotCard, isSelected && styles.slotCardSelected, isFull && styles.slotCardFull]}
-                    onPress={() => !isFull && toggleSlot(slot)}
-                    disabled={isFull}
-                    activeOpacity={isFull ? 1 : 0.8}
+                    style={styles.slotCellWrap}
+                    from={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: 'spring', delay: 80 + idx * 60, damping: 14, stiffness: 160 }}
                   >
-                    {isSelected && <Ionicons name="checkmark-circle" size={16} color={Colors.primary} style={styles.checkIcon} />}
-                    <Text style={[styles.slotTime, isSelected && styles.slotTimeSelected]}>
-                      {formatSlotTime(slot.timeStart, slot.timeEnd)}
-                    </Text>
-                    <Text style={styles.slotDays}>{slot.daysOfWeek.map((d: string) => d.slice(0, 3)).join(', ')}</Text>
-                    <View style={styles.capacityRow}>
-                      <View style={[styles.capacityBar, { width: `${Math.min((slot.enrolledCount / slot.totalCapacity) * 100, 100)}%` as any }]} />
-                    </View>
-                    <Text style={styles.capacityText}>
-                      {isFull ? 'Full' : `${slot.totalCapacity - slot.enrolledCount} seats left`}
-                    </Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.slotCard, isSelected && styles.slotCardSelected, isFull && styles.slotCardFull]}
+                      onPress={() => !isFull && toggleSlot(slot)}
+                      disabled={isFull}
+                      activeOpacity={isFull ? 1 : 0.8}
+                    >
+                      {isSelected && <Ionicons name="checkmark-circle" size={16} color={Colors.primary} style={styles.checkIcon} />}
+                      <Text style={[styles.slotTime, isSelected && styles.slotTimeSelected]}>
+                        {formatSlotTime(slot.timeStart, slot.timeEnd)}
+                      </Text>
+                      <Text style={styles.slotDays}>{slot.daysOfWeek.map((d: string) => d.slice(0, 3)).join(', ')}</Text>
+                      <View style={styles.capacityRow}>
+                        <View style={[styles.capacityBar, { width: `${Math.min((slot.enrolledCount / slot.totalCapacity) * 100, 100)}%` as any }]} />
+                      </View>
+                      <Text style={styles.capacityText}>
+                        {isFull ? 'Full' : `${slot.totalCapacity - slot.enrolledCount} seats left`}
+                      </Text>
+                    </TouchableOpacity>
+                  </MotiView>
                 )
               })}
             </View>
@@ -200,7 +219,8 @@ const styles = StyleSheet.create({
   durationTextActive:{ color: '#fff' },
   discountText:      { fontSize: FontSize.xs, color: Colors.accent, marginTop: 2, fontWeight: FontWeight.semibold },
   slotsGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
-  slotCard:          { width: '47%', backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, borderWidth: 1.5, borderColor: Colors.border, padding: 12, position: 'relative', ...Shadow.xs },
+  slotCellWrap:      { width: '47%' },
+  slotCard:          { width: '100%', backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, borderWidth: 1.5, borderColor: Colors.border, padding: 12, position: 'relative', ...Shadow.xs },
   slotCardSelected:  { borderColor: Colors.primary, backgroundColor: Colors.tealXLight },
   slotCardFull:      { opacity: 0.45 },
   checkIcon:         { position: 'absolute', top: 8, right: 8 },

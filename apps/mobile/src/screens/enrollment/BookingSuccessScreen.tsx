@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Share, ScrollView, Platform, Linking } from 'react-native'
+import { MotiView } from 'moti'
 import { LinearGradient } from 'expo-linear-gradient'
 import QRCode from 'react-native-qrcode-svg'
 import { Ionicons } from '@expo/vector-icons'
@@ -134,13 +135,18 @@ export default function BookingSuccessScreen({ route, navigation }: any) {
     >
       {/* ── Gradient background top ─────────────────────── */}
       <LinearGradient
-        colors={['#0D9488', '#1E3A5F', Colors.background]}
+        colors={['#1AAFC9', '#1C2E4A', Colors.background]}
         start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFillObject}
         locations={[0, 0.35, 0.7]}
       />
 
       {/* ── Success Icon ─────────────────────────────────── */}
+      <MotiView
+        from={{ scale: 0.5, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', damping: 12, stiffness: 180 }}
+      >
       <View style={styles.iconArea}>
         {/* Ripples */}
         <Animated.View style={[styles.ring, { transform: [{ scale: ring1Scale }], opacity: ring1Opacity }]} />
@@ -150,6 +156,7 @@ export default function BookingSuccessScreen({ route, navigation }: any) {
           <Ionicons name="checkmark" size={52} color="#fff" />
         </Animated.View>
       </View>
+      </MotiView>
 
       {/* ── Title ─────────────────────────────────────────── */}
       <Animated.View style={{ alignItems: 'center', opacity: cardOpacity, transform: [{ translateY: cardSlide }] }}>

@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, ActivityIndicator, Platform, FlatList,
 } from 'react-native'
+import { MotiView } from 'moti'
 import * as Location from 'expo-location'
 import { Ionicons } from '@expo/vector-icons'
 import { useEnrollmentStore } from '../../store/enrollmentStore'
@@ -12,29 +13,41 @@ import {
   calculateProratedTransportFee, calculateTransportFee,
 } from '@sportnexus/utils'
 import { Colors, FontSize, BorderRadius, Shadow } from '../../constants/theme'
+import StepIndicator from '../../components/StepIndicator'
 
-// Build next 14 days starting from tomorrow
-function buildDateChips(): Date[] {
+function canStartToday(timeStart?: string): boolean {
+  if (!timeStart) return false
+  const [h, m] = timeStart.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return false
+  const slotTime = new Date()
+  slotTime.setHours(h, m, 0, 0)
+  return new Date() < slotTime
+}
+
+function buildDateChips(includeToday: boolean): Date[] {
   const chips: Date[] = []
   const today = new Date()
-  for (let i = 1; i <= 14; i++) {
+  const start = includeToday ? 0 : 1
+  for (let i = start; i <= 21; i++) {
     const d = new Date(today)
     d.setDate(today.getDate() + i)
-    chips.push(d)
+    if (d.getDay() !== 0) chips.push(d) // skip Sundays — academies are Mon–Sat
+    if (chips.length >= 14) break
   }
   return chips
 }
-
-const DATE_CHIPS = buildDateChips()
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 export default function TransportOptionScreen({ navigation }: any) {
   const {
     setTransport, setStartDate, transportOpted, pickupAddress,
-    pickupDistance, durationMonths, selectedAcademy,
+    pickupDistance, durationMonths, selectedAcademy, selectedSlots,
   } = useEnrollmentStore()
   const { userLat, userLng, homeAddress, setLocation } = useAuthStore()
+
+  const todayAllowed = canStartToday(selectedSlots[0]?.timeStart)
+  const DATE_CHIPS = buildDateChips(todayAllowed)
 
   const [opted, setOpted]           = useState(transportOpted)
   const [address, setAddress]       = useState(pickupAddress ?? homeAddress ?? '')
@@ -121,34 +134,37 @@ export default function TransportOptionScreen({ navigation }: any) {
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
+      <StepIndicator steps={['Schedule', 'Transport', 'Secure']} current={1} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 130 }}>
         <Text style={styles.heading}>Transport Option</Text>
         <Text style={styles.subHeading}>Choose whether you need pickup & drop service</Text>
 
         {/* Self / Transport option cards */}
-        <TouchableOpacity style={[styles.optionCard, !opted && styles.optionCardActive]} onPress={() => setOpted(false)}>
-          <View style={[styles.radio, !opted && styles.radioActive]}>
-            {!opted && <View style={styles.radioDot} />}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.optionTitle}>Self Transport</Text>
-            <Text style={styles.optionDesc}>I'll manage my own commute to the academy</Text>
-          </View>
-          <Text style={styles.optionPrice}>Free</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.optionCard, opted && styles.optionCardActive]} onPress={() => setOpted(true)}>
-          <View style={[styles.radio, opted && styles.radioActive]}>
-            {opted && <View style={styles.radioDot} />}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.optionTitle}>🚌 Pickup & Drop</Text>
-            <Text style={styles.optionDesc}>Door-to-door transport by the academy</Text>
-          </View>
-          <Text style={styles.optionPrice}>₹25/km</Text>
-        </TouchableOpacity>
+        {[
+          { isOpted: false, title: 'Self Transport', desc: "I'll manage my own commute to the academy", price: 'Free', delay: 80 },
+          { isOpted: true, title: '🚌 Pickup & Drop', desc: 'Door-to-door transport by the academy', price: '₹25/km', delay: 160 },
+        ].map(({ isOpted, title, desc, price, delay }) => (
+          <MotiView
+            key={title}
+            from={{ opacity: 0, translateX: -20 }}
+            animate={{ opacity: 1, translateX: 0 }}
+            transition={{ type: 'spring', delay, damping: 18, stiffness: 150 }}
+          >
+            <TouchableOpacity style={[styles.optionCard, (opted === isOpted) && styles.optionCardActive]} onPress={() => setOpted(isOpted)}>
+              <View style={[styles.radio, (opted === isOpted) && styles.radioActive]}>
+                {(opted === isOpted) && <View style={styles.radioDot} />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionTitle}>{title}</Text>
+                <Text style={styles.optionDesc}>{desc}</Text>
+              </View>
+              <Text style={styles.optionPrice}>{price}</Text>
+            </TouchableOpacity>
+          </MotiView>
+        ))}
 
         {/* ── Start Date Picker (shown for all users) ────── */}
+        <MotiView from={{ opacity: 0, translateY: 24, scale: 0.97 }} animate={{ opacity: 1, translateY: 0, scale: 1 }} transition={{ type: 'spring', delay: 240, damping: 18, stiffness: 150 }}>
         <View style={styles.sectionCard}>
           <Text style={styles.detailsTitle}>When do you want to start?</Text>
           <Text style={styles.sectionSubtitle}>
@@ -269,13 +285,16 @@ export default function TransportOptionScreen({ navigation }: any) {
             )}
           </>
         )}
+        </MotiView>
 
+        <MotiView from={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 400 }}>
         <View style={styles.infoBanner}>
           <Ionicons name="information-circle-outline" size={16} color={Colors.primary} />
           <Text style={styles.infoText}>
             Transport = ₹25/km × 2 (round trip) × Mon–Sat working days. Sundays are excluded. First month is prorated from your start date.
           </Text>
         </View>
+        </MotiView>
       </ScrollView>
 
       <View style={styles.bottomBar}>

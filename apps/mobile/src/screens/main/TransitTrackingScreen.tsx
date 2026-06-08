@@ -3,10 +3,12 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   Animated, Linking, ScrollView, Dimensions, Alert, ActivityIndicator,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { MotiView } from 'moti'
 import { Ionicons } from '@expo/vector-icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../store/authStore'
-import { Colors, FontSize, BorderRadius, Shadow } from '../../constants/theme'
+import { Colors, FontSize, FontWeight, BorderRadius, Shadow } from '../../constants/theme'
 import TrackingMap from '../../components/TrackingMap'
 import DriverDetailModal, { DriverDetails } from '../../components/DriverDetailModal'
 import { useTransitSocket } from '../../hooks/useTransitSocket'
@@ -85,6 +87,7 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
   const [showDriver, setShowDriver] = useState(false)
   const [countdown, setCountdown] = useState('')
   const [, forceUpdate] = useState(0)
+  const generateAttempted = useRef(false)
 
   // Fetch today's passenger record (contains session + stop position)
   const { data: todayPassenger, isLoading: passengerLoading } = useQuery({
@@ -93,6 +96,19 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
     staleTime: 30_000,
     refetchInterval: 60_000,
   })
+
+  // Auto-generate session if none exists (handles enrollment after daily cron ran)
+  const { mutate: generateSession, isPending: isGenerating } = useMutation({
+    mutationFn: () => transitAPI.generateToday(),
+    onSettled:  () => queryClient.invalidateQueries({ queryKey: ['transit-today'] }),
+  })
+
+  useEffect(() => {
+    if (!passengerLoading && !todayPassenger && !generateAttempted.current) {
+      generateAttempted.current = true
+      generateSession()
+    }
+  }, [passengerLoading, todayPassenger])
 
   const resolvedSessionId: string | undefined =
     paramSessionId ?? todayPassenger?.session?.id
@@ -203,7 +219,7 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
       : 'your start date'
     return (
       <View style={styles.stateContainer}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.goBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
         <View style={styles.stateIcon}>
@@ -226,15 +242,17 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
     )
   }
 
-  // ── State: initial loading ────────────────────────────────────────────────
-  if (passengerLoading || (sessionLoading && !session)) {
+  // ── State: initial loading or auto-generating ────────────────────────────
+  if (passengerLoading || isGenerating || (sessionLoading && !session)) {
     return (
       <View style={styles.stateContainer}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.goBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Loading transport info...</Text>
+        <Text style={styles.loadingText}>
+          {isGenerating ? 'Setting up your transport...' : 'Loading transport info...'}
+        </Text>
       </View>
     )
   }
@@ -243,7 +261,7 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
   if (trackState === 'no-session') {
     return (
       <View style={styles.stateContainer}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.goBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
         <View style={styles.stateIcon}>
@@ -264,7 +282,7 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
   if (trackState === 'cancelled') {
     return (
       <View style={styles.stateContainer}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.goBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
         <View style={[styles.stateIcon, { backgroundColor: '#FEF2F2' }]}>
@@ -283,7 +301,7 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
   if (trackState === 'completed') {
     return (
       <View style={styles.stateContainer}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.goBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
         <View style={[styles.stateIcon, { backgroundColor: '#ECFDF5' }]}>
@@ -309,7 +327,7 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
 
     return (
       <View style={[styles.stateContainer, { justifyContent: 'flex-start', paddingTop: 80 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.goBackBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
 
@@ -334,7 +352,7 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
                 <Text style={styles.vehicleNum}>{driverDetails.vehicleNumber}</Text>
               </View>
               {!!driverDetails.phone && (
-                <TouchableOpacity style={styles.callBtn} onPress={callDriver}>
+                <TouchableOpacity style={styles.driverActionBtn} onPress={callDriver}>
                   <Ionicons name="call" size={18} color="#fff" />
                 </TouchableOpacity>
               )}
@@ -362,23 +380,43 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
 
   // ── State: pre-pickup & live tracking ────────────────────────────────────
 
+  const statusLabel =
+    mergedStatus === 'AT_ACADEMY' ? 'At Academy'  :
+    mergedStatus === 'PICKED_UP'  ? 'In-Transit'  :
+    mergedStatus === 'ARRIVING'   ? 'Arriving'    :
+    mergedStatus === 'DISPATCHED' ? 'Driver Sent' :
+    mergedStatus === 'SCHEDULED'  ? 'Scheduled'   :
+    STATUS_STEPS[currentStep]?.label ?? 'Tracking'
+
+  const progressPct = Math.min(((currentStep + 1) / STATUS_STEPS.length) * 100, 100)
+
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
-      </TouchableOpacity>
 
-      {!isConnected && trackState === 'live' && (
-        <View style={styles.reconnectBanner}>
-          <ActivityIndicator size="small" color="#fff" />
-          <Text style={styles.reconnectText}>Reconnecting...</Text>
+      {/* ── Gradient top header bar ───────────────── */}
+      <LinearGradient
+        colors={['#1AAFC9', '#1C2E4A']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.topBar}
+      >
+        <View style={styles.topBarLeft}>
+          <TouchableOpacity style={styles.topBackBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={20} color="#fff" />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.topBarTitle}>Transit Tracking</Text>
+            <Text style={styles.topBarSub}>{academy?.name ?? 'Live tracking'}</Text>
+          </View>
         </View>
-      )}
+        <Ionicons name="notifications-outline" size={22} color="rgba(255,255,255,0.9)" />
+      </LinearGradient>
 
+      {/* ── Map area ──────────────────────────────── */}
       <View style={styles.mapContainer}>
         <TrackingMap
-          driverLat={location?.lat ?? pickupLat + 0.012}
-          driverLng={location?.lng ?? pickupLng - 0.008}
+          driverLat={location?.lat ?? destLat}
+          driverLng={location?.lng ?? destLng}
           pickupLat={pickupLat}
           pickupLng={pickupLng}
           destLat={destLat}
@@ -386,101 +424,118 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
           status={mergedStatus}
           onDriverPress={() => setShowDriver(true)}
         />
+
+        {/* Reconnecting banner */}
+        {!isConnected && trackState === 'live' && (
+          <View style={styles.reconnectBanner}>
+            <ActivityIndicator size="small" color="#fff" />
+            <Text style={styles.reconnectText}>Reconnecting...</Text>
+          </View>
+        )}
+
+        {/* User/child photo overlay — top right with LIVE badge */}
+        <View style={styles.livePhotoWrap}>
+          {isLive && isConnected && (
+            <View style={styles.liveBadge}>
+              <Animated.View style={[styles.liveDot, { transform: [{ scale: pulseAnim }] }]} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
+          )}
+          <View style={styles.liveAvatarBox}>
+            <Text style={{ fontSize: 28 }}>👦</Text>
+          </View>
+        </View>
+
       </View>
 
-      {isLive && isConnected && (
-        <View style={styles.liveOverlay}>
-          <Animated.View style={[styles.liveDot, { transform: [{ scale: pulseAnim }] }]} />
-          <Text style={styles.liveText}>LIVE</Text>
-        </View>
-      )}
+      {/* ── Bottom sheet ──────────────────────────── */}
+      <MotiView
+        from={{ translateY: 200, opacity: 0 }}
+        animate={{ translateY: 0, opacity: 1 }}
+        transition={{ type: 'spring', damping: 20, stiffness: 160 }}
+        style={styles.bottomSheet}
+      >
 
-      <View style={styles.bottomSheet}>
-        {/* ETA + Stop position */}
-        <View style={styles.etaBanner}>
+        {/* Status row */}
+        <MotiView from={{ opacity: 0, translateY: 12 }} animate={{ opacity: 1, translateY: 0 }} transition={{ delay: 150 }}>
+        <View style={styles.statusRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.etaLabel}>Estimated Arrival</Text>
-            <Text style={styles.etaValue}>
-              {mergedStatus === 'AT_ACADEMY'  ? 'Arrived at Academy' :
-               mergedStatus === 'PICKED_UP'   ? 'En route to Academy' :
-               mergedStatus === 'SCHEDULED'   ? 'Waiting for driver' :
-               eta != null                    ? `${eta} min away`
-                                             : 'Driver on the way'}
-            </Text>
+            <Text style={styles.currentStatusLabel}>CURRENT STATUS</Text>
+            <Text style={styles.statusBigText}>{statusLabel}</Text>
           </View>
-          <View style={{ gap: 6, alignItems: 'flex-end' }}>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusPillText}>
-                {STATUS_STEPS[currentStep]?.label ?? mergedStatus}
-              </Text>
-            </View>
-            {totalStops > 1 && (
-              <View style={styles.stopPill}>
-                <Ionicons name="flag-outline" size={11} color={Colors.navy} />
-                <Text style={styles.stopPillText}>Stop {myStopOrder} of {totalStops}</Text>
-              </View>
-            )}
+          <View style={styles.etaBadge}>
+            <Text style={styles.etaBadgeSmall}>ETA</Text>
+            <Text style={styles.etaBadgeBig}>{eta != null ? `${eta} Mins` : '—'}</Text>
           </View>
         </View>
+        </MotiView>
+
+        {/* Progress bar */}
+        <MotiView from={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ type: 'timing', delay: 250, duration: 500 }}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progressPct}%` as any }]} />
+          </View>
+        </MotiView>
+
+        {/* Divider */}
+        <View style={styles.divider} />
 
         {/* Driver card */}
         {driverDetails && (
-          <TouchableOpacity style={styles.driverCard} onPress={() => setShowDriver(true)} activeOpacity={0.8}>
-            <View style={styles.driverAvatar}><Text style={{ fontSize: 26 }}>👨‍✈️</Text></View>
+          <MotiView from={{ opacity: 0, translateX: -20 }} animate={{ opacity: 1, translateX: 0 }} transition={{ type: 'spring', delay: 320, damping: 18, stiffness: 150 }}>
+          <TouchableOpacity style={styles.driverCard} onPress={() => setShowDriver(true)} activeOpacity={0.85}>
+            <View style={styles.driverAvatar}>
+              <Text style={{ fontSize: 22 }}>👨‍✈️</Text>
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.driverName}>{driverDetails.name}</Text>
-              <Text style={styles.vehicleNum}>{driverDetails.vehicleNumber}</Text>
+              <View style={styles.driverMeta}>
+                <Ionicons name="star" size={12} color="#F59E0B" />
+                <Text style={styles.driverMetaText}>4.9 · Driver</Text>
+              </View>
             </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={styles.driverBtns}>
+              <TouchableOpacity style={styles.driverActionBtn}>
+                <Ionicons name="chatbubble-outline" size={17} color={Colors.textSecondary} />
+              </TouchableOpacity>
               {!!driverDetails.phone && (
-                <TouchableOpacity style={styles.callBtn} onPress={callDriver}>
-                  <Ionicons name="call" size={18} color="#fff" />
+                <TouchableOpacity style={styles.driverActionBtn} onPress={callDriver}>
+                  <Ionicons name="call" size={17} color={Colors.textSecondary} />
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.infoBtn} onPress={() => setShowDriver(true)}>
-                <Ionicons name="information-circle-outline" size={18} color={Colors.primary} />
-              </TouchableOpacity>
             </View>
           </TouchableOpacity>
+          </MotiView>
         )}
 
-        {/* Progress steps */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stepsScroll}
-          contentContainerStyle={styles.stepsRow}>
-          {STATUS_STEPS.map((step, idx) => {
-            const done    = idx < currentStep
-            const current = idx === currentStep
-            return (
-              <View key={step.key} style={styles.stepItem}>
-                <View style={[styles.stepDot, done && styles.stepDotDone, current && styles.stepDotCurrent]}>
-                  {done
-                    ? <Ionicons name="checkmark" size={12} color="#fff" />
-                    : <Ionicons name={step.icon as any} size={12} color={current ? '#fff' : Colors.textMuted} />
-                  }
-                </View>
-                {idx < STATUS_STEPS.length - 1 && (
-                  <View style={[styles.stepLine, done && styles.stepLineDone]} />
-                )}
-                <Text style={[styles.stepLabel, current && styles.stepLabelActive]} numberOfLines={1}>
-                  {step.label}
-                </Text>
-              </View>
-            )
-          })}
-        </ScrollView>
+        {/* Divider */}
+        <View style={styles.divider} />
 
-        {/* Route row */}
-        <View style={styles.routeRow}>
-          <View style={styles.routePoint}>
-            <View style={[styles.routeDot, { backgroundColor: Colors.primary }]} />
-            <Text style={styles.routeText} numberOfLines={1}>Your Location</Text>
-          </View>
-          <View style={styles.routeDash} />
-          <View style={styles.routePoint}>
-            <View style={[styles.routeDot, { backgroundColor: Colors.navy }]} />
-            <Text style={styles.routeText} numberOfLines={1}>{academy?.name ?? 'Academy'}</Text>
-          </View>
+        {/* Emergency + Share */}
+        <MotiView from={{ opacity: 0, translateY: 20 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', delay: 420, damping: 18, stiffness: 150 }}>
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.emergencyBtn]}
+            onPress={() => Alert.alert('Emergency', 'Calling emergency services...')}
+          >
+            <View style={styles.emergencyIconCircle}>
+              <Text style={styles.emergencyAsterisk}>✳</Text>
+            </View>
+            <Text style={styles.emergencyText}>Emergency Call</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.shareBtn]}
+            onPress={() => {
+              const msg = `Tracking ${session?.driverName ?? 'driver'} — ETA ${eta ?? '?'} min`
+              Linking.openURL(`sms:?body=${encodeURIComponent(msg)}`)
+            }}
+          >
+            <Ionicons name="share-social-outline" size={22} color={Colors.textSecondary} />
+            <Text style={styles.shareText}>Share Link</Text>
+          </TouchableOpacity>
         </View>
+        </MotiView>
 
         {/* Cancel */}
         {CANCELLABLE.includes(mergedStatus) && (
@@ -491,7 +546,7 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
             }
           </TouchableOpacity>
         )}
-      </View>
+      </MotiView>
 
       {showDriver && driverDetails && (
         <DriverDetailModal driver={driverDetails} onClose={() => setShowDriver(false)} />
@@ -502,7 +557,6 @@ export default function TransitTrackingScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
   container:         { flex: 1, backgroundColor: Colors.background },
-  mapContainer:      { flex: 1 },
 
   // Shared state screens
   stateContainer:    { flex: 1, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14 },
@@ -530,48 +584,62 @@ const styles = StyleSheet.create({
   pendingDriverText: { flex: 1, fontSize: FontSize.sm, color: Colors.textSecondary },
   cancelBtnEarly:    { width: '100%', paddingVertical: 12, borderRadius: BorderRadius.md, borderWidth: 1.5, borderColor: Colors.danger, alignItems: 'center', marginTop: 4 },
 
-  // Map overlay
-  backBtn:           { position: 'absolute', top: 16, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', zIndex: 999, ...Shadow.sm },
-  reconnectBanner:   { position: 'absolute', top: 16, left: 72, right: 16, zIndex: 998, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  // ── Top header bar ───────────────────────────────────────────────────────
+  topBar:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 52, paddingBottom: 16, zIndex: 10 },
+  topBarLeft:        { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  topBackBtn:        { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  topBarTitle:       { fontSize: FontSize.base, fontWeight: FontWeight.extrabold, color: '#fff' },
+  topBarSub:         { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
+
+  // ── Map ──────────────────────────────────────────────────────────────────
+  mapContainer:      { flex: 1, position: 'relative' },
+  reconnectBanner:   { position: 'absolute', top: 12, left: 12, right: 12, zIndex: 20, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   reconnectText:     { color: '#fff', fontSize: FontSize.xs, fontWeight: '600' },
-  liveOverlay:       { position: 'absolute', top: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(16,185,129,0.9)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  liveDot:           { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
+
+  // User photo + LIVE badge (top-right of map)
+  livePhotoWrap:     { position: 'absolute', top: 16, right: 16, zIndex: 20, alignItems: 'flex-end', gap: 6 },
+  liveBadge:         { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#EF4444', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-end' },
+  liveDot:           { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
   liveText:          { color: '#fff', fontWeight: '800', fontSize: FontSize.xs, letterSpacing: 1 },
+  liveAvatarBox:     { width: 72, height: 72, borderRadius: 12, backgroundColor: '#1C2E4A', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff', overflow: 'hidden' },
 
-  // Bottom sheet
-  bottomSheet:       { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 8, paddingHorizontal: 16, paddingBottom: 24, ...Shadow.sm, maxHeight: SCREEN_HEIGHT * 0.52 },
-  etaBanner:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
-  etaLabel:          { fontSize: FontSize.xs, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
-  etaValue:          { fontSize: FontSize.xl, fontWeight: '800', color: Colors.textPrimary, marginTop: 2 },
-  statusPill:        { backgroundColor: Colors.tealLight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: BorderRadius.full },
-  statusPillText:    { fontSize: FontSize.xs, color: Colors.primary, fontWeight: '700' },
-  stopPill:          { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: BorderRadius.full },
-  stopPillText:      { fontSize: FontSize.xs, color: Colors.navy, fontWeight: '700' },
+  // ── Bottom sheet ─────────────────────────────────────────────────────────
+  bottomSheet:       { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 28, ...Shadow.lg },
 
-  driverCard:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  driverAvatar:      { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.tealLight, alignItems: 'center', justifyContent: 'center' },
-  driverName:        { fontSize: FontSize.base, fontWeight: '700', color: Colors.textPrimary },
+  // Status row
+  statusRow:         { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 },
+  currentStatusLabel:{ fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.primary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  statusBigText:     { fontSize: 30, fontWeight: FontWeight.black, color: Colors.textPrimary, letterSpacing: -0.5 },
+  etaBadge:          { backgroundColor: '#F1F5F9', borderRadius: BorderRadius.lg, paddingHorizontal: 14, paddingVertical: 10, alignItems: 'center', minWidth: 80 },
+  etaBadgeSmall:     { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  etaBadgeBig:       { fontSize: FontSize.lg, color: Colors.textPrimary, fontWeight: FontWeight.extrabold, marginTop: 2 },
+
+  // Progress bar
+  progressTrack:     { height: 6, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden', marginBottom: 16 },
+  progressFill:      { height: '100%', backgroundColor: Colors.primary, borderRadius: 4 },
+
+  divider:           { height: 1, backgroundColor: Colors.borderLight, marginBottom: 14 },
+
+  // Driver card
+  driverCard:        { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
+  driverAvatar:      { width: 50, height: 50, borderRadius: 25, backgroundColor: '#1C2E4A', alignItems: 'center', justifyContent: 'center' },
+  driverName:        { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.textPrimary },
   vehicleNum:        { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
-  callBtn:           { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
-  infoBtn:           { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.tealLight, alignItems: 'center', justifyContent: 'center' },
+  driverMeta:        { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  driverMetaText:    { fontSize: FontSize.sm, color: Colors.textSecondary },
+  driverBtns:        { flexDirection: 'row', gap: 10 },
+  driverActionBtn:   { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
 
-  stepsScroll:       { marginTop: 14 },
-  stepsRow:          { flexDirection: 'row', alignItems: 'flex-start', paddingBottom: 4, gap: 0 },
-  stepItem:          { alignItems: 'center', flexDirection: 'row' },
-  stepDot:           { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
-  stepDotDone:       { backgroundColor: Colors.accent },
-  stepDotCurrent:    { backgroundColor: Colors.primary },
-  stepLine:          { width: 28, height: 2, backgroundColor: Colors.border },
-  stepLineDone:      { backgroundColor: Colors.accent },
-  stepLabel:         { position: 'absolute', top: 30, fontSize: 9, color: Colors.textMuted, width: 56, textAlign: 'center', left: -14 },
-  stepLabelActive:   { color: Colors.primary, fontWeight: '700' },
+  // Emergency + Share action buttons
+  actionRow:         { flexDirection: 'row', gap: 12 },
+  actionBtn:         { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16, borderRadius: BorderRadius.xl },
+  emergencyBtn:      { backgroundColor: '#FEF2F2' },
+  emergencyIconCircle:{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+  emergencyAsterisk: { fontSize: 16, color: Colors.danger, fontWeight: '800' },
+  emergencyText:     { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.danger },
+  shareBtn:          { backgroundColor: '#F1F5F9' },
+  shareText:         { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.textSecondary },
 
-  routeRow:          { flexDirection: 'row', alignItems: 'center', marginTop: 20, gap: 8 },
-  routePoint:        { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
-  routeDot:          { width: 10, height: 10, borderRadius: 5 },
-  routeText:         { fontSize: FontSize.sm, color: Colors.textSecondary, flex: 1 },
-  routeDash:         { width: 20, height: 1, backgroundColor: Colors.border },
-
-  cancelBtn:         { marginTop: 14, paddingVertical: 12, borderRadius: BorderRadius.md, borderWidth: 1.5, borderColor: Colors.danger, alignItems: 'center' },
+  cancelBtn:         { marginTop: 12, paddingVertical: 12, borderRadius: BorderRadius.md, borderWidth: 1.5, borderColor: Colors.danger, alignItems: 'center' },
   cancelBtnText:     { fontSize: FontSize.sm, fontWeight: '700', color: Colors.danger },
 })

@@ -63,7 +63,7 @@ export default function TrackingMap({ driverLat, driverLng, pickupLat, pickupLng
       // Pickup marker
       const pickupIcon = L.divIcon({
         className: '',
-        html: `<div style="width:16px;height:16px;border-radius:50%;background:#0D9488;border:3px solid white;box-shadow:0 2px 8px rgba(13,148,136,0.5)"></div>`,
+        html: `<div style="width:16px;height:16px;border-radius:50%;background:#1AAFC9;border:3px solid white;box-shadow:0 2px 8px rgba(26,175,201,0.5)"></div>`,
         iconSize: [16, 16],
         iconAnchor: [8, 8],
       })
@@ -71,7 +71,7 @@ export default function TrackingMap({ driverLat, driverLng, pickupLat, pickupLng
       // Academy marker
       const destIcon = L.divIcon({
         className: '',
-        html: `<div style="background:#1E3A5F;color:white;padding:4px 8px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3)">🏟️ Academy</div>`,
+        html: `<div style="background:#1C2E4A;color:white;padding:4px 8px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3)">🏟️ Academy</div>`,
         iconSize: [100, 30],
         iconAnchor: [50, 30],
       })
@@ -89,7 +89,7 @@ export default function TrackingMap({ driverLat, driverLng, pickupLat, pickupLng
       // Route polyline
       routeLine.current = L.polyline(
         [[driverLat, driverLng], [pickupLat, pickupLng], [destLat, destLng]],
-        { color: '#0D9488', weight: 5, opacity: 0.8, dashArray: '10, 6' }
+        { color: '#1AAFC9', weight: 5, opacity: 0.8, dashArray: '10, 6' }
       ).addTo(map)
 
       // Fit all points
